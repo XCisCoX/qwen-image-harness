@@ -1,0 +1,53 @@
+{
+  "note": "Weights are downloaded from Hugging Face at install time and are NOT part of this repository. Qwen Research License - research/evaluation only; commercial use needs a separate licence from Qwen.",
+  "required_gb": 14.3,
+  "optional_gb": 5.9,
+  "mirror": "https://hf-mirror.com",
+  "models": [
+    {
+      "role": "Qwen-Image-2.1 Turbo DiT, 8-step distilled, GGUF Q4_K_M (ComfyUI UnetLoaderGGUF)",
+      "repo": "abenzerps/Qwen-Image-2.1-Turbo-Quantized",
+      "file": "qwen-image-2.1-turbo-Q4_K_M.gguf",
+      "dest": "models/diffusion_models/qwen-image-2.1-turbo-Q4_K_M.gguf",
+      "size": 4050916384,
+      "sha256": "14be42ddc6e324682dd8e073ab32a0a4b3b8cd93657d6ec419dae3cc5f22ef78",
+      "required": true
+    },
+    {
+      "role": "Qwen-Image-2.1 base DiT, 25-step, GGUF Q4_K_M",
+      "repo": "pottokao/Qwen-Image-2.1-DiT-GGUF",
+      "file": "qwen_image_2.1-Q4_K_M.gguf",
+      "dest": "models/diffusion_models/qwen_image_2.1-Q4_K_M.gguf",
+      "size": 4335931552,
+      "sha256": "ec114630a3dbecc925ce764a245232dc450124e7e3e7ec72000f196f25947228",
+      "required": true
+    },
+    {
+      "role": "Qwen3-VL-8B text encoder, vendor W4A8 weights for ComfyUI CLIPLoader type qwen_image",
+      "repo": "Comfy-Org/Qwen-Image-2.1",
+      "file": "text_encoders/qwen3vl_8b_w4a8.safetensors",
+      "dest": "models/text_encoders/qwen3vl_8b_w4a8.safetensors",
+      "size": 6312105364,
+      "sha256": "7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb",
+      "required": true
+    },
+    {
+      "role": "64-channel RGBA VAE, 16x spatial compression",
+      "repo": "Comfy-Org/Qwen-Image-2.1",
+      "file": "vae/qwen_image_2.1_vae_bf16.safetensors",
+      "dest": "models/vae/qwen_image_2.1_vae_bf16.safetensors",
+      "size": 675509688,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9",
+      "required": true
+    },
+    {
+      "role": "Abliterated (Heretic) Qwen3-VL-8B encoder, W4A8, drop-in for stock CLIPLoader",
+      "repo": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-W4A8",
+      "file": "qwen3vl_8b_w4a8_heretic.safetensors",
+      "dest": "models/text_encoders/qwen3vl_8b_w4a8_heretic.safetensors",
+      "size": 6312117504,
+      "sha256": "f560a1c8c26469350ea31cd630bc4bea6f22fc81c73ed16e49a7bcc9ac0f8ed5",
+      "required": false
+    }
+  ]
+}

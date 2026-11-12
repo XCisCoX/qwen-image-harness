@@ -1,0 +1,28 @@
+Third-party components
+======================
+
+Nothing below is bundled in this repository. They are installed or downloaded by the
+user (or by setup.sh) at runtime, from their own upstreams.
+
+ComfyUI  — https://github.com/comfyanonymous/ComfyUI — GPL-3.0
+    Installed separately (git clone) and used as a local HTTP service. This application
+    communicates with it over that HTTP interface and does not link against or embed it.
+
+ComfyUI-GGUF (city96) — https://github.com/city96/ComfyUI-GGUF — GPL-3.0
+    Installed separately. patches/comfyui-gguf-qwen-image-2.1.patch is a modification of
+    that GPL-3.0 work; the patch is distributed under the same licence and the upstream
+    source is fetched by the user.
+
+Qt (Qt 5.15 or Qt 6) — https://www.qt.io — LGPL-3.0 (dynamic linking)
+    Used through the system packages or the user's own Qt installation. This application
+    links to Qt dynamically.
+
+Qwen-Image-2.1 (DiT, VAE, text encoders) — Qwen Research License
+    Weights are downloaded by the user from Hugging Face and are NOT redistributed here.
+    Research / evaluation use only; commercial use requires a separate licence from Qwen.
+    The optional abliterated text encoder is a third-party derivative of the same base
+    model and inherits those terms.
+
+NVIDIA CUDA runtime / cuDNN, PyTorch, and the Python packages pulled in by ComfyUI's
+requirements.txt remain under their respective licences and are installed by pip at the
+user's direction.

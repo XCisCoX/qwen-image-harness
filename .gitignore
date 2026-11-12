@@ -1,0 +1,13 @@
+# build output
+harness/Build-Linux/
+*.o
+moc_*.cpp
+*.moc
+.qmake.stash
+Makefile
+# runtime state
+__pycache__/
+*.pyc
+out/
+*.ini
+*.log

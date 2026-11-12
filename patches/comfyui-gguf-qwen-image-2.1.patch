@@ -1,0 +1,29 @@
+diff --git a/tools/convert.py b/tools/convert.py
+index 5029c87..51392c0 100644
+--- a/tools/convert.py
++++ b/tools/convert.py
+@@ -145,8 +145,23 @@ class ModelLumina2(ModelTemplate):
+         ("cap_embedder.1.weight", "context_refiner.0.attention.qkv.weight")
+     ]
+ 
++class ModelQwenImage21(ModelTemplate):
++    # Qwen-Image 2.1 (and 2.0) DiT. Files converted outside Comfy-Org carry no
++    # general.architecture, so arch detection falls back to tensor names.
++    # Reporting arch "qwen_image" lets ComfyUI's own model_detection pick the
++    # 2.1 vs 2.0 transformer from the same keys.
++    arch = "qwen_image"
++    keys_detect = [
++        (
++            "txt_in.text_norm.weight",
++            "modulation.1.weight",
++            "transformer_blocks.0.attn.norm_q.weight",
++        )
++    ]
++
+ arch_list = [ModelFlux, ModelSD3, ModelAura, ModelHiDream, CosmosPredict2, 
+-             ModelLTXV, ModelHyVid, ModelWan, ModelSDXL, ModelSD1, ModelLumina2]
++             ModelLTXV, ModelHyVid, ModelWan, ModelSDXL, ModelSD1, ModelLumina2,
++             ModelQwenImage21]
+ 
+ def is_model_arch(model, state_dict):
+     # check if model is correct
