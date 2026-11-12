@@ -25,6 +25,9 @@ harness or API subscription, wire it there and keep the entire interface.
 Also: **on-the-fly scaling** of the primary image (defaults to ~1.0 MP, keeps aspect),
 batch, seed lock, per-run JSON sidecars, and a headless mode for scripting.
 
+Unofficial community project. Not affiliated with, endorsed by, or supported by Alibaba or
+the Qwen team; "Qwen" is their trademark and is used here only to say what the app runs.
+
 ## Requirements
 
 * Linux with a CUDA GPU and a recent NVIDIA driver (validated: RTX 2060 SUPER 8 GB,
@@ -89,5 +92,8 @@ defaults to already-open pages, and batch results arrive as separate frames.
 
 ## Licence
 
-Code: MIT (see `LICENSE`). Third-party components are **not** bundled — see `NOTICE`.
+Code: MIT (see `LICENSE`), with one carve-out — `patches/comfyui-gguf-qwen-image-2.1.patch`
+is a modification of GPL-3.0 code (ComfyUI-GGUF) and stays GPL-3.0. Everything else in
+`harness/`, `setup.sh`, `AGENT.md` and the docs is MIT. Third-party components are **not**
+bundled — see `NOTICE`.
 Model weights are downloaded by the user and remain under the Qwen Research License.
