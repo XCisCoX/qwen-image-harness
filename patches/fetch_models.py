@@ -61,6 +61,7 @@ def main():
 
     manifest = json.load(open(args.manifest))
     failures = 0
+    pending = 0
 
     if args.link_into:
         for entry in manifest["models"]:
@@ -98,6 +99,11 @@ def main():
             if not args.dry_run:
                 os.unlink(dest)
 
+        if args.dry_run:
+            pending += 1
+            print(f"  would get  {entry['repo']} :: {entry['file']}  {human(entry['size'])}")
+            continue
+
         url = f"{args.mirror}/{entry['repo']}/resolve/main/{entry['file']}"
         print(f"  get   {entry['repo']} :: {entry['file']}  {human(entry['size'])}")
         if not download(url, dest, args.dry_run):
@@ -123,6 +129,9 @@ def main():
     if failures:
         print(f"\n{failures} file(s) failed - re-run to resume.")
         return 1
+    if args.dry_run:
+        print(f"\ndry-run: {pending} file(s) would be fetched; the rest are already verified")
+        return 0
     print("\nall required weights present and verified")
     return 0
 
