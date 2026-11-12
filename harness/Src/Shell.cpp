@@ -83,7 +83,7 @@ TitleBar::TitleBar(QWidget *parent)
     texts->setContentsMargins(0, 0, 0, 0);
     texts->setSpacing(0);
 
-    QLabel *title = new QLabel("Qwen Image Studio", this);
+    QLabel *title = new QLabel("Qwen Image Harness", this);
     title->setFont(Theme::ui(13, QFont::Bold));
     texts->addWidget(title);
 

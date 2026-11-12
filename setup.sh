@@ -171,8 +171,8 @@ cat <<EOF
 
 === Next
 
-  qwen-image-studio                       # the app
-  qwen-image-studio --run "a brass key"   # headless smoke test
+  qwen-image-harness                       # the app
+  qwen-image-harness --run "a brass key"   # headless smoke test
 
   Settings defaults already point at ${COMFY_DIR} and port 8188; change them in
   the app if you moved things. Outputs land in ~/Pictures/Qwen-Image-Studio.

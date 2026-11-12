@@ -96,7 +96,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_resizing(false)
     , m_resizeEdge(EdgeNone)
 {
-    setWindowTitle("Qwen Image Studio");
+    setWindowTitle("Qwen Image Harness");
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     setMinimumSize(1300, 700);
 
@@ -129,7 +129,7 @@ MainWindow::MainWindow(QWidget *parent)
     if (removed > 0)
         Logging::info(QString("Retention removed %1 old image(s)").arg(removed));
 
-    Logging::info("Qwen Image Studio ready");
+    Logging::info("Qwen Image Harness ready");
 
     if (settings.server().autoStart)
         QTimer::singleShot(400, this, [this]() { toggleServer(); });

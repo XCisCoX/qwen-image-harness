@@ -1,6 +1,6 @@
 QT += core gui widgets network
 
-TARGET   = QwenImageStudio
+TARGET   = QwenImageHarness
 TEMPLATE = app
 
 CONFIG += c++11

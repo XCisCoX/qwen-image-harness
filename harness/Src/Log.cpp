@@ -95,7 +95,7 @@ void Log::clear()
         QFile f(m_logFile);
         if (f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
             QTextStream ts(&f);
-            ts << "# Qwen Image Studio log started " << QDateTime::currentDateTime().toString(Qt::ISODate) << "\n";
+            ts << "# Qwen Image Harness log started " << QDateTime::currentDateTime().toString(Qt::ISODate) << "\n";
         }
     }
     emit cleared();

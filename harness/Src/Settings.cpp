@@ -3,14 +3,32 @@
 #include <QColor>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 
+namespace {
+
+// The app used to be called QwenImageStudio. Its settings live in
+// $XDG_CONFIG_HOME/Qwen/QwenImageStudio.ini; carry them over once so an existing
+// install keeps its paths and server settings.
+void migrateLegacySettings()
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/Qwen";
+    const QString legacy = dir + "/QwenImageStudio.ini";
+    const QString current = dir + "/QwenImageHarness.ini";
+    if (!QFile::exists(current) && QFile::exists(legacy))
+        QFile::copy(legacy, current);
+}
+
+} // namespace
+
 AppSettings::AppSettings(QObject *parent)
     : QObject(parent)
-    , m_qs(QSettings::IniFormat, QSettings::UserScope, "Qwen", "QwenImageStudio")
+    , m_qs(QSettings::IniFormat, QSettings::UserScope, "Qwen", "QwenImageHarness")
     , m_accent(0)
 {
+    migrateLegacySettings();
     load();
 }
 
@@ -32,7 +50,7 @@ static QString appDataRoot()
 {
     QString p = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (p.isEmpty())
-        p = QDir::homePath() + "/.local/share/QwenImageStudio";
+        p = QDir::homePath() + "/.local/share/QwenImageHarness";
     return p;
 }
 

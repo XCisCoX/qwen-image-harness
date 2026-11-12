@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Qwen Image Studio on Linux (or any Unix with qmake).
+# Build Qwen Image Harness on Linux (or any Unix with qmake).
 #
 #   ./build-linux.sh              # release build into Build-Linux/
 #   BUILD_CONFIG=debug ./build-linux.sh
@@ -38,4 +38,4 @@ else
     exit 1
 fi
 
-echo "[INFO] Build completed: ${BUILD_DIR}/QwenImageStudio"
+echo "[INFO] Build completed: ${BUILD_DIR}/QwenImageHarness"

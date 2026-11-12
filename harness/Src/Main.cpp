@@ -24,7 +24,7 @@ QIcon buildAppIcon()
 }
 
 /*!
- * Headless mode: `QwenImageStudio --run "a brass key" [options]`
+ * Headless mode: `QwenImageHarness --run "a brass key" [options]`
  *
  * Runs exactly the same backend and graph builder as the GUI, prints the saved
  * paths on stdout and the backend log on stderr. Exit code 0 on success.
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName("Qwen");
-    QCoreApplication::setApplicationName("Qwen Image Studio");
+    QCoreApplication::setApplicationName("Qwen Image Harness");
     QCoreApplication::setApplicationVersion("0.1.0");
 
     QCommandLineParser parser;

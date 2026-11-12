@@ -496,7 +496,7 @@ QWidget *SettingsPage::buildAboutCard()
 
     QLabel *text = new QLabel(
         QString("<div style='line-height:150%'>"
-                "<b>Qwen Image Studio</b> 0.1.0<br>"
+                "<b>Qwen Image Harness</b> 0.1.0<br>"
                 "Frontend shell for Qwen-Image-2.1.<br><br>"
                 "Qt %1  &middot;  %2<br>"
                 "The UI talks to an abstract backend; the bundled build uses a simulator."

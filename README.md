@@ -1,4 +1,4 @@
-# Qwen Image Studio
+# Qwen Image Harness
 
 A desktop frontend for **Qwen-Image-2.1** on a consumer GPU: generate, edit, face-swap
 and mask-infill, browse results, watch the engine's log. Qt/C++, no web stack, one binary.
@@ -45,7 +45,7 @@ Deterministic path:
 
 ```bash
 ./setup.sh            # venv, ComfyUI v0.39.2, GGUF patch, weights, UI build, launcher
-qwen-image-studio
+qwen-image-harness
 ```
 
 Or hand the repository to an agent and point it at **AGENT.md** — it is written as a
@@ -55,8 +55,8 @@ hard way.
 Headless smoke test:
 
 ```bash
-qwen-image-studio --run "a brass key on dark slate" --steps 8 --out /tmp/out
-qwen-image-studio --run "add a small flower here" --mode mask \
+qwen-image-harness --run "a brass key on dark slate" --steps 8 --out /tmp/out
+qwen-image-harness --run "add a small flower here" --mode mask \
     --image photo.png --mask mask.png --out /tmp/out
 ```
 

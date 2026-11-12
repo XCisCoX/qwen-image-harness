@@ -33,7 +33,7 @@ You are done when all five pass. Report each one with the command you ran.
 | G1 | environment | `python3 -c "import torch"` works in the ComfyUI venv, `torch.cuda.is_available()` is True, device capability printed |
 | G2 | engine | ComfyUI answers on `127.0.0.1:8188` and `/object_info/UnetLoaderGGUF` lists the Qwen GGUF |
 | G3 | weights | every entry in `models.json` either verifies by sha256 or is marked optional and skipped |
-| G4 | UI | `harness/Build-Linux/QwenImageStudio --version` prints a version, and a headless run writes a PNG |
+| G4 | UI | `harness/Build-Linux/QwenImageHarness --version` prints a version, and a headless run writes a PNG |
 | G5 | mask correctness | outside `mask + 14 px` the output is byte-identical to the input |
 
 Do not claim success on "it looks right". G5 is numeric on purpose.
@@ -161,7 +161,7 @@ launcher, icon and `.desktop` entry go into `~/.local` — no root.
 Headless mode is part of the same binary and is what you verify with:
 
 ```bash
-qwen-image-studio --run "a brass key on dark slate" --steps 8 --size 1024 --out /tmp/t
+qwen-image-harness --run "a brass key on dark slate" --steps 8 --size 1024 --out /tmp/t
 ```
 
 ---
@@ -171,14 +171,14 @@ qwen-image-studio --run "a brass key on dark slate" --steps 8 --size 1024 --out 
 G4, generation:
 
 ```bash
-qwen-image-studio --run "a red ceramic mug on a wooden table" --steps 8 --size 1024 --out /tmp/g4
+qwen-image-harness --run "a red ceramic mug on a wooden table" --steps 8 --size 1024 --out /tmp/g4
 # prints the saved path, exits 0.  ~45 s on a 2060 SUPER.
 ```
 
 G5, mask correctness — this is the one that catches a dishonest inpaint:
 
 ```bash
-qwen-image-studio --run "add a small red flower here" --mode mask \
+qwen-image-harness --run "add a small red flower here" --mode mask \
     --image examples/pole.png --mask examples/pole_mask.png --steps 8 --out /tmp/g5
 ```
 
