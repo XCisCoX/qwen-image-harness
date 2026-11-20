@@ -56,6 +56,7 @@ private:
 
     ToggleSwitch *m_autoSave;
     ToggleSwitch *m_sidecar;
+    ToggleSwitch *m_livePreview;
     ToggleSwitch *m_retention;
     QSpinBox *m_retentionDays;
 

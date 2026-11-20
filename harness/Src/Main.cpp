@@ -62,6 +62,8 @@ int runHeadless(QApplication &app, const QCommandLineParser &parser, PageMode mo
         }
         req.maskPath = QFileInfo(parser.value("mask")).absoluteFilePath();
         req.inpaintErase = !parser.isSet("inpaint-keep");
+        req.inpaintFill = (parser.value("inpaint-fill").toLower() == "noise") ? 1 : 0;
+        req.inpaintGrow = parser.value("inpaint-grow").toInt();
         const QString context = parser.value("inpaint-context").toLower();
         req.inpaintFullImage = (context == "full" || context == "whole");
     }
@@ -153,6 +155,12 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption("mask", "Mask PNG, white = regenerate.", "path"));
     parser.addOption(QCommandLineOption("inpaint-keep",
         "Mask mode: let the model see the original content under the mask (default: erased)."));
+    parser.addOption(QCommandLineOption("inpaint-fill",
+        "Mask mode fill: 'colour' (tone-matched flat, default) or 'noise' (Fooocus style).",
+        "colour|noise", "colour"));
+    parser.addOption(QCommandLineOption("inpaint-grow",
+        "Mask mode: let the sampler repaint N px beyond the painted area (default 0).",
+        "N", "0"));
     parser.addOption(QCommandLineOption("inpaint-context",
         "Mask mode: 'area' (crop + surroundings, default) or 'full' (whole frame).",
         "area|full", "area"));

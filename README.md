@@ -23,7 +23,8 @@ harness or API subscription, wire it there and keep the entire interface.
 | Settings | paths, server command, defaults, retention, accent colour |
 
 Also: **on-the-fly scaling** of the primary image (defaults to ~1.0 MP, keeps aspect),
-**a prompt queue** (submit as many as you like, they run in order), batch, seed lock,
+**a prompt queue** (submit as many as you like, they run in order), **optional live
+preview** of the sampler, batch, seed lock,
 per-run JSON sidecars, and a headless mode for scripting.
 
 Unofficial community project. Not affiliated with, endorsed by, or supported by Alibaba or
@@ -85,11 +86,20 @@ Two controls on the Mask infill page decide what the model knows and what it see
   it cannot copy the shape or detail that was there - the Fooocus behaviour, minus the halo
   a flat grey fill causes against a hard-edged background. Unchecked, the original content stays visible and the model
   tends to recolour or nudge it instead of replacing it.
+* **Fill: Matched colour / Noise.** What the masked pixels become before the model sees
+  them. Matched colour is a flat fill sampled from the ring around the mask; Noise is the
+  Fooocus behaviour, noise around that tone, which gives the model a texture to start
+  from (fuzzier results, sometimes better fur/skin).
 * **Context: Area + surroundings / Whole image.** Cropping a window around the mask keeps
   detail high (the crop is rendered at ~1024 px); whole-image mode hands over the entire
   frame at native scale, at the cost of detail on a small mask.
 
-Headless equivalents: `--inpaint-keep` and `--inpaint-context full|area`.
+The sampler is also allowed to repaint ~12 px beyond the painted area (the way Fooocus
+does it) while only the painted pixels are pasted back, so the model can blend its own
+edge into the surroundings.
+
+Headless equivalents: `--inpaint-keep`, `--inpaint-fill colour|noise`, `--inpaint-grow N`,
+`--inpaint-context full|area`.
 
 ## Mask infill, briefly
 

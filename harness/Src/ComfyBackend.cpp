@@ -1,5 +1,8 @@
 #include "ComfyBackend.h"
 
+#include <QWebSocket>
+#include <QUuid>
+
 #include <QDateTime>
 #include <QDir>
 #include <QEventLoop>
@@ -112,6 +115,38 @@ QImage blurMask(const QImage &gray, int radius)
     return img;
 }
 
+// Max-filter: grows the white region by `radius`. Used to let the sampler repaint
+// a little beyond the painted area, the way Fooocus does, so the model can blend
+// its own edge into the surroundings instead of stopping dead at the mask.
+QImage dilateMask(const QImage &gray, int radius)
+{
+    if (radius <= 0)
+        return gray;
+    const QImage src = gray.convertToFormat(QImage::Format_Grayscale8);
+    QImage out(src.size(), QImage::Format_Grayscale8);
+    const int w = src.width(), h = src.height();
+    for (int y = 0; y < h; ++y) {
+        uchar *dst = out.scanLine(y);
+        for (int x = 0; x < w; ++x) {
+            int maxv = 0;
+            const int y0 = qMax(0, y - radius), y1 = qMin(h - 1, y + radius);
+            const int x0 = qMax(0, x - radius), x1 = qMin(w - 1, x + radius);
+            for (int yy = y0; yy <= y1 && maxv < 255; ++yy) {
+                const uchar *line = src.constScanLine(yy);
+                for (int xx = x0; xx <= x1; ++xx) {
+                    if (line[xx] > maxv) {
+                        maxv = line[xx];
+                        if (maxv == 255)
+                            break;
+                    }
+                }
+            }
+            dst[x] = uchar(maxv);
+        }
+    }
+    return out;
+}
+
 // Min-filter: shrinks the white region by `radius`, so a later blur ramps the alpha
 // *inside* the mask instead of outside it. Feathering outward mixes the original
 // surroundings into the new content and shows up as a halo.
@@ -147,7 +182,7 @@ QImage erodeMask(const QImage &gray, int radius)
 // Fooocus-style prep: knock the masked pixels out of the reference image so the
 // model cannot read what used to be there. Flat mid-grey is what SDXL-style
 // inpaint pipelines feed the encoder for the same reason.
-QImage eraseMaskedArea(const QImage &image, const QImage &mask)
+QImage eraseMaskedArea(const QImage &image, const QImage &mask, int mode, quint32 seed)
 {
     QImage out = image.convertToFormat(QImage::Format_RGB888);
     const QImage m = mask.convertToFormat(QImage::Format_Grayscale8);
@@ -180,6 +215,31 @@ QImage eraseMaskedArea(const QImage &image, const QImage &mask)
         for (int c = 0; c < 3; ++c)
             fill[c] = uchar(qBound(0.0, sum[c] / weight, 255.0));
 
+    if (mode == 1) {
+        // Noise fill, Fooocus style: the model is handed no structure at all. Noise
+        // around the ring's tone keeps the border from clashing while still leaving
+        // nothing to copy.
+        quint32 state = seed ? seed : 1u;
+        const QImage rampN = blurMask(m, 2);
+        for (int y = 0; y < out.height(); ++y) {
+            uchar *line = out.scanLine(y);
+            const uchar *rampLine = rampN.constScanLine(y);
+            for (int x = 0; x < out.width(); ++x) {
+                const int a = rampLine[x];
+                if (a == 0)
+                    continue;
+                state = state * 1664525u + 1013904223u;
+                const int n = int((state >> 16) & 0xFF) - 128;   // -128..127
+                uchar *px = line + x * 3;
+                for (int c = 0; c < 3; ++c) {
+                    const int v = qBound(0, int(fill[c]) + n * 45 / 128, 255);
+                    px[c] = uchar((px[c] * (255 - a) + v * a) / 255);
+                }
+            }
+        }
+        return out;
+    }
+
     const QImage ramp = blurMask(m, 2);   // 2 px ramp so the fill edge is soft
     for (int y = 0; y < out.height(); ++y) {
         uchar *line = out.scanLine(y);
@@ -202,6 +262,7 @@ ComfyBackend::ComfyBackend(QObject *parent)
     : Backend(parent)
     , m_net(new QNetworkAccessManager(this))
     , m_proc(nullptr)
+    , m_ws(nullptr)
     , m_health(new QTimer(this))
     , m_poll(new QTimer(this))
     , m_port(8188)
@@ -754,6 +815,8 @@ QString ComfyBackend::submit(const GenerationRequest &request)
         return QString();
     }
 
+    openPreviewStream();
+
     Job *job = new Job;
     job->id = QUuid::createUuid().toString().remove('{').remove('}').left(8);
     job->req = request;
@@ -860,7 +923,8 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
             line[x] = line[x] > 127 ? 255 : 0;
     }
     if (job->req.inpaintErase)
-        cropImage = eraseMaskedArea(cropImage, cropMask);
+        cropImage = eraseMaskedArea(cropImage, cropMask, job->req.inpaintFill,
+                                    quint32(job->req.seed > 0 ? job->req.seed : 7));
 
     QString dir = QDir::tempPath() + "/qwenstudio-inpaint";
     QDir().mkpath(dir);
@@ -869,6 +933,14 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
     if (!cropImage.save(job->cropImagePath, "PNG") || !cropMask.save(job->cropMaskPath, "PNG")) {
         *error = "cannot write the crop files";
         return false;
+    }
+
+    if (job->req.inpaintGrow > 0) {
+        // The sampler may touch a slightly larger area than we will paste back.
+        QImage grown = dilateMask(cropMask, job->req.inpaintGrow);
+        if (grown.save(job->cropMaskPath, "PNG")) {
+            log(QString("Infill: sampler region grown by %1 px").arg(job->req.inpaintGrow));
+        }
     }
 
     job->cropRect = rect;
@@ -884,6 +956,88 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
             .arg(rect.width()).arg(rect.height())
             .arg(work.width()).arg(work.height()));
     return true;
+}
+
+
+void ComfyBackend::openPreviewStream()
+{
+    if (m_ws)
+        return;
+    if (!AppSettings::instance().livePreview())
+        return;
+
+    m_wsClientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_ws = new QWebSocket(QString(), QWebSocketProtocol::VersionLatest, this);
+    connect(m_ws, &QWebSocket::binaryMessageReceived, this, &ComfyBackend::onPreviewFrame);
+    connect(m_ws, &QWebSocket::textMessageReceived, this, [this](const QString &text) {
+        // Only surface failures; progress_state messages arrive several times a second.
+        if (text.contains(QStringLiteral("execution_error")))
+            log(QString("ws: %1").arg(text.left(240)));
+    });
+    connect(m_ws, &QWebSocket::disconnected, this, [this]() {
+        if (m_ws) {
+            m_ws->deleteLater();
+            m_ws = nullptr;
+        }
+    });
+    QUrl url;
+    url.setScheme(QStringLiteral("ws"));
+    url.setHost(QStringLiteral("127.0.0.1"));
+    url.setPort(m_port);
+    url.setPath(QStringLiteral("/ws"));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("clientId"), m_wsClientId);
+    url.setQuery(query);
+    connect(m_ws, &QWebSocket::connected, this, [this]() {
+        // ComfyUI 0.39 only streams sampler previews to clients that declare this,
+        // and it sends them as PREVIEW_IMAGE_WITH_METADATA (event 4).
+        m_ws->sendTextMessage(QStringLiteral(
+            "{\"type\":\"feature_flags\",\"data\":{\"supports_preview_metadata\":true}}"));
+        log("Live preview: connected, preview flags sent");
+    });
+    m_ws->open(url);
+    log(QString("Live preview: connecting to %1").arg(url.toString()));
+}
+
+void ComfyBackend::closePreviewStream()
+{
+    if (!m_ws)
+        return;
+    m_ws->close();
+    m_ws->deleteLater();
+    m_ws = nullptr;
+}
+
+// ComfyUI sends previews as [4 byte big-endian event type][4 byte image type][image].
+// Event type 1 is PREVIEW_IMAGE; the payload is a PNG or JPEG the sampler produced.
+void ComfyBackend::onPreviewFrame(const QByteArray &message)
+{
+    if (message.size() < 8) {
+        log(QString("ws binary ignored: %1 bytes").arg(message.size()));
+        return;
+    }
+    const quint32 eventType = (quint32(uchar(message[0])) << 24) | (quint32(uchar(message[1])) << 16)
+                              | (quint32(uchar(message[2])) << 8) | quint32(uchar(message[3]));
+    QByteArray payload;
+    if (eventType == 1) {
+        // legacy: [4B event][4B image type][image]
+        payload = message.mid(8);
+    } else if (eventType == 4) {
+        // [4B event][4B metadata length][metadata json][image]
+        const quint32 metaLen = (quint32(uchar(message[4])) << 24) | (quint32(uchar(message[5])) << 16)
+                                | (quint32(uchar(message[6])) << 8) | quint32(uchar(message[7]));
+        payload = message.mid(8 + int(metaLen));
+    } else {
+        log(QString("ws binary event %1, %2 bytes").arg(eventType).arg(message.size()));
+        return;
+    }
+    QImage frame;
+    if (!frame.loadFromData(payload)) {
+        log(QString("preview frame could not be decoded (%1 bytes)").arg(message.size()));
+        return;
+    }
+    log(QString("preview frame %1x%2").arg(frame.width()).arg(frame.height()));
+    emit previewReady(frame);
 }
 
 void ComfyBackend::beginUploads(Job *job)
@@ -930,7 +1084,11 @@ void ComfyBackend::queueJob(Job *job)
     const QJsonObject graph = buildGraph(*job);
     QJsonObject body{
         {"prompt", graph},
-        {"client_id", QUuid::createUuid().toString().remove('{').remove('}')},
+        // Must match the preview websocket's clientId, or the engine routes the
+        // sampler's preview frames to a socket that does not exist.
+        {"client_id", m_wsClientId.isEmpty()
+                          ? QUuid::createUuid().toString().remove('{').remove('}')
+                          : m_wsClientId},
     };
 
     QJsonObject reply;
@@ -1174,6 +1332,7 @@ void ComfyBackend::completeJob(Job *job, const QJsonObject &entry)
     m_step = m_total = 0;
     delete job;
 
+    closePreviewStream();
     emit jobFinished(result);
 }
 
@@ -1236,6 +1395,7 @@ void ComfyBackend::cancel(const QString &jobId)
     m_step = m_total = 0;
     delete job;
 
+    closePreviewStream();
     emit jobFinished(result);
 }
 

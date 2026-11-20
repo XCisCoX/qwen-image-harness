@@ -108,6 +108,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_backend, &Backend::stateChanged, this, &MainWindow::onBackendState);
     connect(m_backend, &Backend::progress, this, &MainWindow::onProgress);
     connect(m_backend, &Backend::jobFinished, this, &MainWindow::onJobFinished);
+    connect(m_backend, &Backend::previewReady, this, [this](const QImage &frame) {
+        if (CreatePage *page = pageForId(m_jobPageId))
+            page->showPreview(frame);
+    });
     connect(m_backend, &Backend::jobFailed, this, &MainWindow::onJobFailed);
 
     QScreen *screen = QGuiApplication::primaryScreen();

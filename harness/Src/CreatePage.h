@@ -5,6 +5,7 @@
 #include "Settings.h"
 
 #include <QSize>
+#include <QImage>
 #include <QWidget>
 
 class Card;
@@ -34,6 +35,7 @@ public:
     void setBusy(bool busy);
     void setProgress(int percent, const QString &stage);
     void showResult(const GenerationResult &result);
+    void showPreview(const QImage &image);
     void removePath(const QString &path);
     void clearOutput();
     QStringList currentPaths() const;

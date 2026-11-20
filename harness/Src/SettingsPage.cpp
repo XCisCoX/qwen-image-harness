@@ -67,6 +67,7 @@ SettingsPage::SettingsPage(QWidget *parent)
     , m_maskDir(nullptr)
     , m_autoSave(nullptr)
     , m_sidecar(nullptr)
+    , m_livePreview(nullptr)
     , m_retention(nullptr)
     , m_retentionDays(nullptr)
     , m_command(nullptr)
@@ -260,6 +261,12 @@ QWidget *SettingsPage::buildDataCard()
     card->body()->addWidget(switchRow("Write JSON sidecars",
                                       "Store the prompt, seed and parameters next to each image.",
                                       m_sidecar));
+
+    m_livePreview = new ToggleSwitch(card);
+    card->body()->addWidget(switchRow("Live preview",
+                                      "Stream the sampler's own preview frames while a job runs. "
+                                      "Off by default; the finished image is unaffected.",
+                                      m_livePreview));
 
     m_retention = new ToggleSwitch(card);
     m_retentionDays = new QSpinBox(card);
@@ -525,6 +532,7 @@ void SettingsPage::loadFromSettings()
 
     m_autoSave->setChecked(s.data().autoSave);
     m_sidecar->setChecked(s.data().sidecar);
+    m_livePreview->setChecked(s.data().livePreview);
     m_retention->setChecked(s.data().retentionEnabled);
     m_retentionDays->setValue(s.data().retentionDays);
     m_retentionDays->setEnabled(s.data().retentionEnabled);
@@ -570,6 +578,7 @@ void SettingsPage::applyToSettings()
     DataOptions data;
     data.autoSave = m_autoSave->isChecked();
     data.sidecar = m_sidecar->isChecked();
+    data.livePreview = m_livePreview->isChecked();
     data.retentionEnabled = m_retention->isChecked();
     data.retentionDays = m_retentionDays->value();
     s.setData(data);

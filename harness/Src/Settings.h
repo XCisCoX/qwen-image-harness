@@ -33,12 +33,14 @@ struct DataOptions {
     bool sidecar;
     bool retentionEnabled;
     int retentionDays;
+    bool livePreview;   //!< stream the sampler's preview frames over the engine websocket
 
     DataOptions()
         : autoSave(true)
         , sidecar(false)
         , retentionEnabled(false)
         , retentionDays(30)
+        , livePreview(false)
     {
     }
 };
@@ -81,6 +83,7 @@ public:
     QString logFilePath() const;
 
     const DataOptions &data() const { return m_data; }
+    bool livePreview() const { return m_data.livePreview; }
     const ServerOptions &server() const { return m_server; }
     const GenerationDefaults &defaults() const { return m_gen; }
     QString lastPage() const { return m_lastPage; }

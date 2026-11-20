@@ -76,6 +76,7 @@ private:
     QPushButton *m_queue;
     QCheckBox *m_eraseBox;
     QComboBox *m_contextBox;
+    QComboBox *m_fillBox;
     QLabel *m_count;
 };
 

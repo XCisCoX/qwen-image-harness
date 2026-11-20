@@ -455,6 +455,12 @@ QWidget *CreatePage::buildCenterColumn()
     return column;
 }
 
+void CreatePage::showPreview(const QImage &image)
+{
+    if (m_output)
+        m_output->showPreview(image);
+}
+
 void CreatePage::onSubmit()
 {
     GenerationRequest request = m_params->request();

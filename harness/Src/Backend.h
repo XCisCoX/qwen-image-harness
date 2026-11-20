@@ -2,6 +2,7 @@
 #define BACKEND_H
 
 #include <QMetaType>
+#include <QImage>
 #include <QObject>
 #include <QSize>
 #include <QString>
@@ -41,6 +42,8 @@ struct GenerationRequest {
     QString maskPath;     //!< only for MaskInfill
     bool inpaintErase;    //!< MaskInfill: paint the masked area out before the model sees the
                           //!< image, so it has to invent that content instead of copying it
+    int inpaintFill;      //!< MaskInfill: 0 = tone-matched flat colour, 1 = noise (Fooocus)
+    int inpaintGrow;      //!< MaskInfill: pixels the sampler may touch beyond the painted area
     bool inpaintFullImage;//!< MaskInfill: give the model the whole frame instead of a crop
 
     GenerationRequest()
@@ -52,6 +55,8 @@ struct GenerationRequest {
         , sampler("Euler")
         , seed(-1)
         , inpaintErase(true)
+        , inpaintFill(0)
+        , inpaintGrow(12)
         , inpaintFullImage(false)
     {
     }
@@ -117,6 +122,9 @@ public:
     virtual void discardImage(const QString &imagePath);
 
 signals:
+    //! A live frame from the engine's sampler (only while a job is running).
+    void previewReady(const QImage &image);
+
     void stateChanged(int state);
     void progress(const QString &jobId, int percent, const QString &stage);
     void jobFinished(const GenerationResult &result);

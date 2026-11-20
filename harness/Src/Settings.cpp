@@ -80,6 +80,7 @@ void AppSettings::load()
     m_data.autoSave = m_qs.value("data/autoSave", true).toBool();
     m_data.sidecar = m_qs.value("data/sidecar", false).toBool();
     m_data.retentionEnabled = m_qs.value("data/retentionEnabled", false).toBool();
+    m_data.livePreview = m_qs.value("data/livePreview", false).toBool();
     m_data.retentionDays = m_qs.value("data/retentionDays", 30).toInt();
 
     m_server.command = m_qs.value("server/command",
@@ -114,6 +115,7 @@ void AppSettings::save()
     m_qs.setValue("data/autoSave", m_data.autoSave);
     m_qs.setValue("data/sidecar", m_data.sidecar);
     m_qs.setValue("data/retentionEnabled", m_data.retentionEnabled);
+    m_qs.setValue("data/livePreview", m_data.livePreview);
     m_qs.setValue("data/retentionDays", m_data.retentionDays);
 
     m_qs.setValue("server/command", m_server.command);

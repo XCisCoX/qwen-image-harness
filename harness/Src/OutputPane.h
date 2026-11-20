@@ -27,6 +27,8 @@ public:
     void setBusy(bool busy);
     void setProgress(int percent, const QString &stage);
     void showResult(const GenerationResult &result);
+    void showPreview(const QImage &image);
+    QLabel *m_livePreview;
     void removePath(const QString &path);
     void clear();
 

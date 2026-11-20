@@ -93,6 +93,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     , m_queue(nullptr)
     , m_eraseBox(nullptr)
     , m_contextBox(nullptr)
+    , m_fillBox(nullptr)
     , m_count(nullptr)
 {
     QVBoxLayout *root = new QVBoxLayout(this);
@@ -262,6 +263,26 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
         m_eraseBox->setToolTip("Paint the masked pixels out of the reference the model sees, so it "
                                "has to invent that area instead of copying what was there.");
         maskLayout->addWidget(m_eraseBox);
+
+        QWidget *fillRow = new QWidget(maskBox);
+        QHBoxLayout *fillLayout = new QHBoxLayout(fillRow);
+        fillLayout->setContentsMargins(0, 0, 0, 0);
+        fillLayout->setSpacing(8);
+        QLabel *fillLabel = new QLabel("Fill", fillRow);
+        fillLabel->setObjectName("Hint");
+        m_fillBox = new QComboBox(fillRow);
+        m_fillBox->addItem("Matched colour");
+        m_fillBox->addItem("Noise");
+        m_fillBox->setToolTip("What the masked pixels become before the model sees them: a flat "
+                              "colour sampled from the surroundings, or noise (Fooocus style).");
+        fillLayout->addWidget(fillLabel);
+        fillLayout->addWidget(m_fillBox, 1);
+        maskLayout->addWidget(fillRow);
+
+        connect(m_eraseBox, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_fillBox)
+                m_fillBox->setEnabled(on);
+        });
 
         QWidget *contextRow = new QWidget(maskBox);
         QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
@@ -491,6 +512,7 @@ GenerationRequest ParamPanel::request() const
                    : qint64(-1);
     if (m_mode == PageMode::MaskInfill) {
         req.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
+        req.inpaintFill = (m_fillBox && m_fillBox->currentIndex() == 1) ? 1 : 0;
         req.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
     }
     return req;

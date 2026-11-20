@@ -1,5 +1,7 @@
 #include "OutputPane.h"
 
+#include "Log.h"
+
 #include "Icons.h"
 #include "Settings.h"
 #include "Theme.h"
@@ -51,8 +53,9 @@ OutputPane::OutputPane(QWidget *parent)
     , m_stack(nullptr)
     , m_emptyPage(nullptr)
     , m_busyPage(nullptr)
-    , m_resultPage(nullptr)
     , m_preview(nullptr)
+    , m_livePreview(nullptr)
+    , m_resultPage(nullptr)
     , m_index(0)
     , m_hasResult(false)
     , m_thumbBar(nullptr)
@@ -124,6 +127,12 @@ OutputPane::OutputPane(QWidget *parent)
     busyLayout->setContentsMargins(14, 14, 14, 14);
     busyLayout->setSpacing(10);
     busyLayout->addStretch(1);
+
+    m_livePreview = new QLabel(m_busyPage);
+    m_livePreview->setAlignment(Qt::AlignCenter);
+    m_livePreview->setMinimumHeight(180);
+    m_livePreview->setVisible(false);
+    busyLayout->addWidget(m_livePreview, 1);
 
     m_busyTitle = new QLabel("Generating", m_busyPage);
     m_busyTitle->setFont(Theme::ui(14, QFont::DemiBold));
@@ -235,8 +244,29 @@ void OutputPane::clear()
     showEmpty();
 }
 
+void OutputPane::showPreview(const QImage &image)
+{
+    if (!m_livePreview || image.isNull())
+        return;
+    static bool logged = false;
+    if (!logged) {
+        Logging::info(QString("Live preview: first frame %1x%2 shown in the output pane")
+                          .arg(image.width()).arg(image.height()));
+        logged = true;
+    }
+    m_livePreview->setVisible(true);
+    m_livePreview->setPixmap(QPixmap::fromImage(image).scaled(
+        m_livePreview->width() > 0 ? m_livePreview->width() : 320,
+        m_livePreview->height() > 0 ? m_livePreview->height() : 320,
+        Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
 void OutputPane::setBusy(bool busy)
 {
+    if (m_livePreview && !busy) {
+        m_livePreview->clear();
+        m_livePreview->setVisible(false);
+    }
     if (busy) {
         m_stack->setCurrentWidget(m_busyPage);
         m_bar->setValue(0);
