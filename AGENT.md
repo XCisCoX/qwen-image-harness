@@ -232,8 +232,8 @@ Not a cut-and-paste. In order:
    3–12 px feather **only along the painted edge**.
 
 Two knobs change that pipeline (UI checkboxes, or `--inpaint-keep` and
-`--inpaint-context full`): `inpaintErase` paints the masked pixels flat grey before the
-upload so the model has to invent them instead of copying (default on), and
+`--inpaint-context full`): `inpaintErase` fills the masked pixels with the average colour of the ring around
+the mask before the upload so the model has to invent them instead of copying (default on), and
 `inpaintFullImage` uses the whole frame instead of a crop. Neither changes G5: nothing
 outside the mask may move.
 
