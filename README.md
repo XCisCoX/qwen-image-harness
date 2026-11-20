@@ -76,6 +76,20 @@ harness/docs/BACKEND.md        the request/result shapes and the rules
 an ordered image list (`images[0]` is the primary) and an optional mask path. That is
 everything the four workflows collect — a new backend needs nothing else.
 
+## Mask infill options
+
+Two controls on the Mask infill page decide what the model knows and what it sees:
+
+* **Regenerate the masked area from scratch** (default on). The masked pixels are painted
+  flat grey in the reference the model receives, so it cannot copy what was there - this
+  is the Fooocus behaviour. Unchecked, the original content stays visible and the model
+  tends to recolour or nudge it instead of replacing it.
+* **Context: Area + surroundings / Whole image.** Cropping a window around the mask keeps
+  detail high (the crop is rendered at ~1024 px); whole-image mode hands over the entire
+  frame at native scale, at the cost of detail on a small mask.
+
+Headless equivalents: `--inpaint-keep` and `--inpaint-context full|area`.
+
 ## Mask infill, briefly
 
 A hard cut-and-paste leaves a seam and lets existing geometry drift. The reference client

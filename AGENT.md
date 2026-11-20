@@ -230,6 +230,12 @@ Not a cut-and-paste. In order:
 4. decode, downscale to the crop, composite into the original at the crop offset with a
    3–12 px feather **only along the painted edge**.
 
+Two knobs change that pipeline (UI checkboxes, or `--inpaint-keep` and
+`--inpaint-context full`): `inpaintErase` paints the masked pixels flat grey before the
+upload so the model has to invent them instead of copying (default on), and
+`inpaintFullImage` uses the whole frame instead of a crop. Neither changes G5: nothing
+outside the mask may move.
+
 Any implementation that skips (1) gives the model no context; one that skips (3) lets it
 redraw the whole crop; one that feathers widely smears untouched geometry. G5 catches
 all three.
