@@ -109,6 +109,18 @@ masked latents, then blends back with a few pixels of feather along the painted 
 Measured on a pole with hard edges: 0 changed pixels outside `mask + 14 px`, pole edges
 bit-identical above and below the edit. `AGENT.md` §9 has the pipeline and §7 the test.
 
+## Live preview
+
+Settings -> Data controls has a "Live preview" switch. When it is on, the app opens the
+engine's websocket and paints the sampler's own preview frames into the Output pane while
+a job runs; the finished image is identical either way.
+
+It needs the engine started with `--preview-method latent2rgb` (what this build's defaults
+use). `taesd` also works if `models/vae_approx/taeqi2_1_decoder.safetensors` is present -
+prettier, but it costs VRAM. ComfyUI only streams previews to a client that advertises
+`supports_preview_metadata` and passes a matching `client_id` with the prompt; the app does
+both, which is why a plain websocket client sees silence.
+
 ## Status
 
 Working, verified on the hardware above: generate (42 s), base 25-step (88 s), edit (56 s),
