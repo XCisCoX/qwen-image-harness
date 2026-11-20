@@ -17,13 +17,14 @@ harness or API subscription, wire it there and keep the entire interface.
 | Generate | prompt → image, 1–16 reference images |
 | Edit | change a photo with instructions, optional extra references |
 | Face swap | identity transfer, same request shape as edit |
-| Mask infill | paint a mask, re-render only that area (crop + context + noise mask) |
+| Mask infill | paint a mask, re-render only that area — from scratch or keeping the original |
 | Gallery | everything in the output folder, newest first |
 | Terminal | the engine's log and this app's own backend messages |
 | Settings | paths, server command, defaults, retention, accent colour |
 
 Also: **on-the-fly scaling** of the primary image (defaults to ~1.0 MP, keeps aspect),
-batch, seed lock, per-run JSON sidecars, and a headless mode for scripting.
+**a prompt queue** (submit as many as you like, they run in order), batch, seed lock,
+per-run JSON sidecars, and a headless mode for scripting.
 
 Unofficial community project. Not affiliated with, endorsed by, or supported by Alibaba or
 the Qwen team; "Qwen" is their trademark and is used here only to say what the app runs.

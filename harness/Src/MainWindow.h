@@ -39,6 +39,7 @@ private slots:
     void toggleServer();
     void onBackendState(int state);
     void onJobRequested(const GenerationRequest &request, const QString &pageId);
+    void onQueueRequested(const GenerationRequest &request, const QString &pageId);
     void onProgress(const QString &jobId, int percent, const QString &stage);
     void onJobFinished(const GenerationResult &result);
     void onJobFailed(const QString &jobId, const QString &message);
@@ -76,6 +77,8 @@ private:
 
     Backend *m_backend;
     QString m_activeJobId;
+    QList<QPair<GenerationRequest, QString>> m_queue;
+    void startNextQueued();
     QString m_jobPageId;
     bool m_resizing;
     int m_resizeEdge;

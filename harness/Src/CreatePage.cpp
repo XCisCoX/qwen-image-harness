@@ -13,6 +13,7 @@
 #include <QButtonGroup>
 #include <cmath>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -147,6 +148,7 @@ CreatePage::CreatePage(PageMode mode, QWidget *parent)
     root->addWidget(splitter, 1);
 
     connect(m_params, &ParamPanel::submitRequested, this, &CreatePage::onSubmit);
+    connect(m_params, &ParamPanel::queueRequested, this, &CreatePage::onQueue);
 
     connect(m_output, &OutputPane::discardRequested, this, &CreatePage::discardRequested);
 
@@ -251,6 +253,36 @@ QWidget *CreatePage::buildInputColumn()
         scaleLayout->addStretch(1);
         scaleLayout->addWidget(scaleButton);
         layout->addWidget(scaleRow);
+    }
+
+    if (m_mode == PageMode::MaskInfill) {
+        m_eraseBox = new QCheckBox("Regenerate the masked area from scratch", column);
+        m_eraseBox->setChecked(true);
+        m_eraseBox->setCursor(Qt::PointingHandCursor);
+        m_eraseBox->setToolTip("Paint the masked pixels out before the model sees the image, so it "
+                               "has to invent that area instead of copying what was there. "
+                               "Unchecked, the model still sees the original content.");
+        layout->addWidget(m_eraseBox);
+
+        QWidget *contextRow = new QWidget(column);
+        QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
+        contextLayout->setContentsMargins(0, 0, 0, 0);
+        contextLayout->setSpacing(8);
+
+        QLabel *contextLabel = new QLabel("Context", contextRow);
+        contextLabel->setObjectName("Hint");
+
+        m_contextBox = new QComboBox(contextRow);
+        m_contextBox->addItem("Area + surroundings");
+        m_contextBox->addItem("Whole image");
+        m_contextBox->setToolTip("How much of the picture the model may look at while it fills "
+                                 "the mask. Area + surroundings crops a window around your mask; "
+                                 "whole image gives it the full frame at a lower effective detail.");
+
+        contextLayout->addWidget(contextLabel);
+        contextLayout->addStretch(1);
+        contextLayout->addWidget(m_contextBox);
+        layout->addWidget(contextRow);
     }
 
     layout->addStretch(1);
@@ -456,12 +488,25 @@ QWidget *CreatePage::buildCenterColumn()
 void CreatePage::onSubmit()
 {
     GenerationRequest request = m_params->request();
+    if (buildRequest(request))
+        emit submitRequested(request, pageId());
+}
+
+void CreatePage::onQueue()
+{
+    GenerationRequest request = m_params->request();
+    if (buildRequest(request))
+        emit queueRequested(request, pageId());
+}
+
+bool CreatePage::buildRequest(GenerationRequest &request)
+{
     QStringList images;
 
     if (m_mode == PageMode::MaskInfill) {
         if (!m_canvas->hasBase()) {
             Logging::error("Choose a primary image before infilling.");
-            return;
+            return false;
         }
         images.append(m_canvas->basePath());
         images.append(m_images->refPaths());
@@ -475,9 +520,11 @@ void CreatePage::onSubmit()
             QString error;
             if (!m_canvas->saveMaskFile(maskPath, &error)) {
                 Logging::error(error);
-                return;
+                return false;
             }
             request.maskPath = maskPath;
+            request.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
+            request.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
         } else {
             Logging::warn("No mask painted - the whole image will be regenerated.");
         }
@@ -485,7 +532,7 @@ void CreatePage::onSubmit()
         images = m_images->paths();
         if (images.isEmpty() && m_mode != PageMode::Generate) {
             Logging::error(QString("%1 needs a primary image.").arg(modeTitle(m_mode)));
-            return;
+            return false;
         }
     }
 
@@ -522,7 +569,7 @@ void CreatePage::onSubmit()
     }
 
     request.images = images;
-    emit submitRequested(request, pageId());
+    return true;
 }
 
 

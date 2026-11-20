@@ -39,6 +39,9 @@ struct GenerationRequest {
     qint64 seed;          //!< -1 means "pick one"
     QStringList images;
     QString maskPath;     //!< only for MaskInfill
+    bool inpaintErase;    //!< MaskInfill: paint the masked area out before the model sees the
+                          //!< image, so it has to invent that content instead of copying it
+    bool inpaintFullImage;//!< MaskInfill: give the model the whole frame instead of a crop
 
     GenerationRequest()
         : mode(PageMode::Generate)
@@ -48,6 +51,8 @@ struct GenerationRequest {
         , batch(1)
         , sampler("Euler")
         , seed(-1)
+        , inpaintErase(true)
+        , inpaintFullImage(false)
     {
     }
 

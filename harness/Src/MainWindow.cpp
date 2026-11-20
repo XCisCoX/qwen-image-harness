@@ -216,6 +216,7 @@ void MainWindow::buildPages()
         m_createPages.append(page);
 
         connect(page, &CreatePage::submitRequested, this, &MainWindow::onJobRequested);
+        connect(page, &CreatePage::queueRequested, this, &MainWindow::onQueueRequested);
         connect(page, &CreatePage::viewRequested, this, &MainWindow::onViewRequested);
         connect(page, &CreatePage::revealRequested, this, &MainWindow::onRevealRequested);
         connect(page, &CreatePage::galleryRequested, this, [this]() { goToPage("gallery"); });
@@ -464,6 +465,34 @@ void MainWindow::onBackendState(int state)
     }
 }
 
+void MainWindow::onQueueRequested(const GenerationRequest &request, const QString &pageId)
+{
+    if (m_backend->state() != Backend::Running) {
+        showToast("Start the backend first", 0);
+        Logging::warn("Queued request ignored: backend is not running");
+        return;
+    }
+
+    if (m_activeJobId.isEmpty()) {
+        onJobRequested(request, pageId);
+        return;
+    }
+
+    m_queue.append(qMakePair(request, pageId));
+    Logging::info(QString("Queued: \"%1\" (%2 waiting)")
+                      .arg(request.prompt.left(48), QString::number(m_queue.size())));
+    showToast(QString("Queued (%1 waiting)").arg(m_queue.size()), 1);
+}
+
+void MainWindow::startNextQueued()
+{
+    if (!m_activeJobId.isEmpty() || m_queue.isEmpty())
+        return;
+    const QPair<GenerationRequest, QString> next = m_queue.takeFirst();
+    Logging::info(QString("Starting queued job (%1 left)").arg(m_queue.size()));
+    QTimer::singleShot(0, this, [this, next]() { onJobRequested(next.first, next.second); });
+}
+
 void MainWindow::onJobRequested(const GenerationRequest &request, const QString &pageId)
 {
     if (m_backend->state() != Backend::Running) {
@@ -473,7 +502,10 @@ void MainWindow::onJobRequested(const GenerationRequest &request, const QString 
     }
 
     if (!m_activeJobId.isEmpty()) {
-        showToast("A job is already running", 0);
+        // Something is running: hold this one instead of refusing it.
+        m_queue.append(qMakePair(request, pageId));
+        Logging::info(QString("Queued behind the running job (%1 waiting)").arg(m_queue.size()));
+        showToast(QString("Queued (%1 waiting)").arg(m_queue.size()), 1);
         return;
     }
 
@@ -516,6 +548,7 @@ void MainWindow::onJobFinished(const GenerationResult &result)
     m_status->setBusy(false);
     m_activeJobId.clear();
     m_jobPageId.clear();
+    startNextQueued();
 
     if (result.cancelled) {
         showToast("Job cancelled", 0);

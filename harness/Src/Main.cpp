@@ -61,6 +61,9 @@ int runHeadless(QApplication &app, const QCommandLineParser &parser, PageMode mo
             return 2;
         }
         req.maskPath = QFileInfo(parser.value("mask")).absoluteFilePath();
+        req.inpaintErase = !parser.isSet("inpaint-keep");
+        const QString context = parser.value("inpaint-context").toLower();
+        req.inpaintFullImage = (context == "full" || context == "whole");
     }
 
     Backend *backend = createBackend(&app);
@@ -148,6 +151,11 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption("image", "Primary image (edit/faceswap/mask).", "path"));
     parser.addOption(QCommandLineOption("ref", "Reference image; repeatable.", "path"));
     parser.addOption(QCommandLineOption("mask", "Mask PNG, white = regenerate.", "path"));
+    parser.addOption(QCommandLineOption("inpaint-keep",
+        "Mask mode: let the model see the original content under the mask (default: erased)."));
+    parser.addOption(QCommandLineOption("inpaint-context",
+        "Mask mode: 'area' (crop + surroundings, default) or 'full' (whole frame).",
+        "area|full", "area"));
     parser.addOption(QCommandLineOption("negative", "Negative prompt.", "text", ""));
     parser.addOption(QCommandLineOption("size", "Square size in pixels.", "px", "1024"));
     parser.addOption(QCommandLineOption("steps", "Sampling steps (<=12 picks the turbo checkpoint).", "n", "8"));

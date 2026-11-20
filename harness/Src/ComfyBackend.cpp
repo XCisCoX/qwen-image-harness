@@ -112,6 +112,30 @@ QImage blurMask(const QImage &gray, int radius)
     return img;
 }
 
+// Fooocus-style prep: knock the masked pixels out of the reference image so the
+// model cannot read what used to be there. Flat mid-grey is what SDXL-style
+// inpaint pipelines feed the encoder for the same reason.
+QImage eraseMaskedArea(const QImage &image, const QImage &mask)
+{
+    QImage out = image.convertToFormat(QImage::Format_RGB888);
+    const QImage m = mask.convertToFormat(QImage::Format_Grayscale8);
+    if (m.size() != out.size())
+        return out;
+    for (int y = 0; y < out.height(); ++y) {
+        uchar *line = out.scanLine(y);
+        const uchar *maskLine = m.constScanLine(y);
+        for (int x = 0; x < out.width(); ++x) {
+            if (maskLine[x] > 127) {
+                uchar *px = line + x * 3;
+                px[0] = 127;
+                px[1] = 127;
+                px[2] = 127;
+            }
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 ComfyBackend::ComfyBackend(QObject *parent)
@@ -726,33 +750,47 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
         return false;
     }
 
-    // Context margin: the model has to see the structure around the hole, or it
-    // invents geometry that no longer lines up with the untouched pixels.
-    const int pad = qMax(64, int(qMax(bounds.width(), bounds.height()) * 0.45));
-    QRect crop = bounds.adjusted(-pad, -pad, pad, pad).intersected(original.rect());
+    QRect rect;
+    if (job->req.inpaintFullImage) {
+        // Whole-frame context: the model sees every edge of the picture, which is
+        // what "whole image" mode means. Still snapped to the VAE grid.
+        rect = QRect(0, 0, qMax(64, (original.width() / 16) * 16),
+                     qMax(64, (original.height() / 16) * 16));
+    } else {
+        // Context margin: the model has to see the structure around the hole, or it
+        // invents geometry that no longer lines up with the untouched pixels.
+        const int pad = qMax(64, int(qMax(bounds.width(), bounds.height()) * 0.45));
+        QRect crop = bounds.adjusted(-pad, -pad, pad, pad).intersected(original.rect());
 
-    // Snap to the 16 px VAE grid so nothing is resampled twice afterwards.
-    int x0 = (crop.left() / 16) * 16;
-    int y0 = (crop.top() / 16) * 16;
-    int x1 = qMin(original.width(), ((crop.right() + 16) / 16) * 16);
-    int y1 = qMin(original.height(), ((crop.bottom() + 16) / 16) * 16);
-    x0 = qMax(0, x0);
-    y0 = qMax(0, y0);
-    x1 = qMax(x0 + 64, x1 - ((x1 - x0) % 16));
-    y1 = qMax(y0 + 64, y1 - ((y1 - y0) % 16));
-    const QRect rect(x0, y0, x1 - x0, y1 - y0);
+        // Snap to the 16 px VAE grid so nothing is resampled twice afterwards.
+        int x0 = (crop.left() / 16) * 16;
+        int y0 = (crop.top() / 16) * 16;
+        int x1 = qMin(original.width(), ((crop.right() + 16) / 16) * 16);
+        int y1 = qMin(original.height(), ((crop.bottom() + 16) / 16) * 16);
+        x0 = qMax(0, x0);
+        y0 = qMax(0, y0);
+        x1 = qMax(x0 + 64, x1 - ((x1 - x0) % 16));
+        y1 = qMax(y0 + 64, y1 - ((y1 - y0) % 16));
+        rect = QRect(x0, y0, x1 - x0, y1 - y0);
+    }
 
     // Work size: the model's comfortable budget. Small crops are upscaled so the
-    // masked detail is rendered at ~1024 px instead of a thumbnail's worth.
-    const double scale = qBound(0.5, 1024.0 / qMax(rect.width(), rect.height()), 3.0);
+    // masked detail is rendered at ~1024 px instead of a thumbnail's worth. The
+    // whole frame is never upscaled - there is no detail to gain.
+    const double longSide = qMax(rect.width(), rect.height());
+    const double scale = job->req.inpaintFullImage
+                             ? qMin(1.0, 1024.0 / longSide)
+                             : qBound(0.5, 1024.0 / longSide, 3.0);
     const QSize work(qMax(64, int(std::lround(rect.width() * scale / 16.0) * 16)),
                      qMax(64, int(std::lround(rect.height() * scale / 16.0) * 16)));
 
-    const QImage cropImage = original.copy(rect)
-                                 .convertToFormat(QImage::Format_RGB888)
-                                 .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    QImage cropImage = original.copy(rect)
+                           .convertToFormat(QImage::Format_RGB888)
+                           .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     const QImage cropMask = gray.copy(rect)
                                 .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    if (job->req.inpaintErase)
+        cropImage = eraseMaskedArea(cropImage, cropMask);
 
     QString dir = QDir::tempPath() + "/qwenstudio-inpaint";
     QDir().mkpath(dir);
@@ -767,6 +805,9 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
     job->workSize = work;
     job->featherMask = gray.copy(rect);   // original scale, for the local blend
 
+    log(QString("Infill: %1 context, masked content %2")
+            .arg(job->req.inpaintFullImage ? "whole-image" : "area+surroundings",
+                 job->req.inpaintErase ? "erased from the reference" : "visible to the model"));
     log(QString("Infill: mask %1x%2 at %3,%4 -> crop %5x%6 -> model sees %7x%8")
             .arg(bounds.width()).arg(bounds.height())
             .arg(bounds.x()).arg(bounds.y())

@@ -8,6 +8,8 @@
 #include <QWidget>
 
 class Card;
+class QCheckBox;
+class QComboBox;
 class ImageSlots;
 class MaskCanvas;
 class OutputPane;
@@ -41,6 +43,7 @@ public:
 
 signals:
     void submitRequested(const GenerationRequest &request, const QString &pageId);
+    void queueRequested(const GenerationRequest &request, const QString &pageId);
     void viewRequested(const QStringList &paths, int index);
     void revealRequested(const QString &path);
     void galleryRequested();
@@ -49,12 +52,14 @@ signals:
 
 private slots:
     void onSubmit();
+    void onQueue();
     void updateCounts();
     void updateMaskButtons();
     void chooseBaseImage();
     void chooseMaskFile();
     void saveMaskFile();
     void promptScale();
+    bool buildRequest(GenerationRequest &request);
 
 private:
     QWidget *buildHeader();
@@ -71,6 +76,8 @@ private:
     QLabel *m_countBadge;
     QLabel *m_scaleLabel;
     QSize m_scaleTarget;
+    QCheckBox *m_eraseBox;
+    QComboBox *m_contextBox;
     QLabel *m_refsBadge;
     QSlider *m_brushSlider;
     QLabel *m_brushLabel;

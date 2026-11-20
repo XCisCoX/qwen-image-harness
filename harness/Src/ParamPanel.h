@@ -36,6 +36,7 @@ public:
 
 signals:
     void submitRequested();
+    void queueRequested();
 
 private slots:
     void onSizePresetChanged(int index);
@@ -69,6 +70,7 @@ private:
     QSpinBox *m_batch;
     ThemeCombo *m_sampler;
     QPushButton *m_submit;
+    QPushButton *m_queue;
     QLabel *m_count;
 };
 

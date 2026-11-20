@@ -88,6 +88,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     , m_batch(nullptr)
     , m_sampler(nullptr)
     , m_submit(nullptr)
+    , m_queue(nullptr)
     , m_count(nullptr)
 {
     QVBoxLayout *root = new QVBoxLayout(this);
@@ -257,6 +258,15 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     root->addWidget(m_count);
 
     connect(m_submit, &QPushButton::clicked, this, &ParamPanel::submitRequested);
+
+    m_queue = new QPushButton(QStringLiteral("Add to queue"), this);
+    m_queue->setObjectName("Ghost");
+    m_queue->setCursor(Qt::PointingHandCursor);
+    m_queue->setFixedHeight(28);
+    m_queue->setToolTip("Run this request after the current one instead of waiting: "
+                        "queue as many as you like, they run in order.");
+    root->addWidget(m_queue);
+    connect(m_queue, &QPushButton::clicked, this, &ParamPanel::queueRequested);
     connect(m_sizeCombo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             this, &ParamPanel::onSizePresetChanged);
     connect(m_width, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, [this](int v) {
