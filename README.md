@@ -80,9 +80,10 @@ everything the four workflows collect — a new backend needs nothing else.
 
 Two controls on the Mask infill page decide what the model knows and what it sees:
 
-* **Regenerate the masked area from scratch** (default on). The masked pixels are painted
-  flat grey in the reference the model receives, so it cannot copy what was there - this
-  is the Fooocus behaviour. Unchecked, the original content stays visible and the model
+* **Regenerate the masked area from scratch** (default on). The masked pixels are replaced
+  with the average colour of the surrounding ring in the reference the model receives, so
+  it cannot copy the shape or detail that was there - the Fooocus behaviour, minus the halo
+  a flat grey fill causes against a hard-edged background. Unchecked, the original content stays visible and the model
   tends to recolour or nudge it instead of replacing it.
 * **Context: Area + surroundings / Whole image.** Cropping a window around the mask keeps
   detail high (the crop is rendered at ~1024 px); whole-image mode hands over the entire

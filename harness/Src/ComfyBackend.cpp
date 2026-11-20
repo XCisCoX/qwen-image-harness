@@ -112,6 +112,38 @@ QImage blurMask(const QImage &gray, int radius)
     return img;
 }
 
+// Min-filter: shrinks the white region by `radius`, so a later blur ramps the alpha
+// *inside* the mask instead of outside it. Feathering outward mixes the original
+// surroundings into the new content and shows up as a halo.
+QImage erodeMask(const QImage &gray, int radius)
+{
+    if (radius <= 0)
+        return gray;
+    const QImage src = gray.convertToFormat(QImage::Format_Grayscale8);
+    QImage out(src.size(), QImage::Format_Grayscale8);
+    const int w = src.width(), h = src.height();
+    for (int y = 0; y < h; ++y) {
+        uchar *dst = out.scanLine(y);
+        for (int x = 0; x < w; ++x) {
+            int minv = 255;
+            const int y0 = qMax(0, y - radius), y1 = qMin(h - 1, y + radius);
+            const int x0 = qMax(0, x - radius), x1 = qMin(w - 1, x + radius);
+            for (int yy = y0; yy <= y1 && minv > 0; ++yy) {
+                const uchar *line = src.constScanLine(yy);
+                for (int xx = x0; xx <= x1; ++xx) {
+                    if (line[xx] < minv) {
+                        minv = line[xx];
+                        if (minv == 0)
+                            break;
+                    }
+                }
+            }
+            dst[x] = uchar(minv);
+        }
+    }
+    return out;
+}
+
 // Fooocus-style prep: knock the masked pixels out of the reference image so the
 // model cannot read what used to be there. Flat mid-grey is what SDXL-style
 // inpaint pipelines feed the encoder for the same reason.
@@ -121,16 +153,44 @@ QImage eraseMaskedArea(const QImage &image, const QImage &mask)
     const QImage m = mask.convertToFormat(QImage::Format_Grayscale8);
     if (m.size() != out.size())
         return out;
+
+    // Fill with the average colour of a ring just outside the mask, not plain grey.
+    // A mid-grey fill is the strongest "forget it" signal, but against a sky it
+    // leaves a hard edge that the model answers with a halo. A tone-matched flat
+    // fill has no edge and still carries no detail, shape or colour of its own.
+    const QImage ring = blurMask(m, 8);
+    double sum[3] = {0, 0, 0};
+    double weight = 0;
+    for (int y = 0; y < out.height(); ++y) {
+        const uchar *line = out.constScanLine(y);
+        const uchar *mLine = m.constScanLine(y);
+        const uchar *rLine = ring.constScanLine(y);
+        for (int x = 0; x < out.width(); ++x) {
+            if (mLine[x] > 8 || rLine[x] < 16)
+                continue;
+            const double w = rLine[x] / 255.0;
+            const uchar *px = line + x * 3;
+            for (int c = 0; c < 3; ++c)
+                sum[c] += px[c] * w;
+            weight += w;
+        }
+    }
+    uchar fill[3] = {127, 127, 127};
+    if (weight > 1.0)
+        for (int c = 0; c < 3; ++c)
+            fill[c] = uchar(qBound(0.0, sum[c] / weight, 255.0));
+
+    const QImage ramp = blurMask(m, 2);   // 2 px ramp so the fill edge is soft
     for (int y = 0; y < out.height(); ++y) {
         uchar *line = out.scanLine(y);
-        const uchar *maskLine = m.constScanLine(y);
+        const uchar *rampLine = ramp.constScanLine(y);
         for (int x = 0; x < out.width(); ++x) {
-            if (maskLine[x] > 127) {
-                uchar *px = line + x * 3;
-                px[0] = 127;
-                px[1] = 127;
-                px[2] = 127;
-            }
+            const int a = rampLine[x];
+            if (a == 0)
+                continue;
+            uchar *px = line + x * 3;
+            for (int c = 0; c < 3; ++c)
+                px[c] = uchar((px[c] * (255 - a) + fill[c] * a) / 255);
         }
     }
     return out;
@@ -787,8 +847,18 @@ bool ComfyBackend::prepareMaskedCrop(Job *job, QString *error)
     QImage cropImage = original.copy(rect)
                            .convertToFormat(QImage::Format_RGB888)
                            .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    const QImage cropMask = gray.copy(rect)
-                                .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    // The mask the sampler sees must be binary: a soft (resampled) mask makes
+    // SetLatentNoiseMask denoise the edge only partially, which shows up as a halo
+    // of original pixels bleeding into the regenerated area. The softness belongs
+    // in the composite, not in the latent mask.
+    QImage cropMask = gray.copy(rect)
+                          .scaled(work, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                          .convertToFormat(QImage::Format_Grayscale8);
+    for (int y = 0; y < cropMask.height(); ++y) {
+        uchar *line = cropMask.scanLine(y);
+        for (int x = 0; x < cropMask.width(); ++x)
+            line[x] = line[x] > 127 ? 255 : 0;
+    }
     if (job->req.inpaintErase)
         cropImage = eraseMaskedArea(cropImage, cropMask);
 
@@ -933,8 +1003,65 @@ bool ComfyBackend::blendMaskedResult(Job *job, const QString &downloadedPath, QS
 
     // A few pixels of feather, and only at the painted edge: enough to avoid a
     // hard cut, small enough that untouched geometry is not dragged around.
-    const int feather = qBound(3, qMax(rect.width(), rect.height()) / 90, 12);
-    const QImage alpha = blurMask(job->featherMask, feather);
+    // Small feather: a wide one turns any mismatch at the mask edge into a visible
+    // halo (sky against a dark hat, for instance). The ring match below fixes the
+    // tone, so the blend only has to hide the last pixel or two.
+    const int feather = qBound(2, qMax(rect.width(), rect.height()) / 300, 6);
+    // Feather inward only: erode by the feather radius, then blur. Every pixel that
+    // is not fully inside the painted area stays exactly as it was, so nothing of the
+    // original surroundings can leak into the new content as a glow.
+    const QImage alpha = blurMask(erodeMask(job->featherMask, feather), feather);
+
+    // Tone match: compare the patch with the original in a thin ring just outside
+    // the mask, and shift the patch by the difference. Without this the model's
+    // own haze/tint at the boundary survives the blend as a glow.
+    {
+        const QImage ring = blurMask(job->featherMask, 8);   // soft ring, 0..255
+        double origSum[3] = {0, 0, 0};
+        double patchSum[3] = {0, 0, 0};
+        double weight = 0;
+        for (int y = 0; y < rect.height(); ++y) {
+            const uchar *o = out.constScanLine(rect.y() + y);
+            const uchar *p2 = patch.constScanLine(y);
+            const uchar *m = job->featherMask.constScanLine(y);
+            const uchar *r = ring.constScanLine(y);
+            for (int x = 0; x < rect.width(); ++x) {
+                if (m[x] > 8)            // only the untouched surroundings
+                    continue;
+                const double w = r[x] / 255.0;
+                if (w <= 0.02)
+                    continue;
+                const uchar *op = o + (rect.x() + x) * 3;
+                const uchar *pp = p2 + x * 3;
+                for (int c = 0; c < 3; ++c) {
+                    origSum[c] += op[c] * w;
+                    patchSum[c] += pp[c] * w;
+                }
+                weight += w;
+            }
+        }
+        if (weight > 1.0) {
+            int delta[3];
+            for (int c = 0; c < 3; ++c) {
+                const double d = (origSum[c] - patchSum[c]) / weight;
+                delta[c] = int(qBound(-30.0, d, 30.0));
+            }
+            if (delta[0] || delta[1] || delta[2]) {
+                QImage corrected = patch;
+                for (int y = 0; y < corrected.height(); ++y) {
+                    uchar *line = corrected.scanLine(y);
+                    for (int x = 0; x < corrected.width(); ++x) {
+                        uchar *px = line + x * 3;
+                        for (int c = 0; c < 3; ++c)
+                            px[c] = uchar(qBound(0, int(px[c]) + delta[c], 255));
+                    }
+                }
+                patch = corrected;
+                log(QString("Infill: tone matched patch by (%1, %2, %3)")
+                        .arg(delta[0]).arg(delta[1]).arg(delta[2]));
+            }
+        }
+    }
 
     for (int y = 0; y < rect.height(); ++y) {
         uchar *dst = out.scanLine(rect.y() + y);
