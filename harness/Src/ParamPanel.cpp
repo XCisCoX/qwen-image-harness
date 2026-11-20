@@ -8,6 +8,8 @@
 #include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -89,6 +91,8 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     , m_sampler(nullptr)
     , m_submit(nullptr)
     , m_queue(nullptr)
+    , m_eraseBox(nullptr)
+    , m_contextBox(nullptr)
     , m_count(nullptr)
 {
     QVBoxLayout *root = new QVBoxLayout(this);
@@ -241,6 +245,45 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     grid->addWidget(resetBox, 3, 1);
 
     root->addLayout(grid);
+
+    if (m_mode == PageMode::MaskInfill) {
+        QWidget *maskBox = new QWidget(this);
+        QVBoxLayout *maskLayout = new QVBoxLayout(maskBox);
+        maskLayout->setContentsMargins(0, 12, 0, 0);
+        maskLayout->setSpacing(6);
+
+        QLabel *maskLabel = new QLabel("MASK", maskBox);
+        maskLabel->setObjectName("Hint");
+        maskLayout->addWidget(maskLabel);
+
+        m_eraseBox = new QCheckBox("Regenerate from scratch", maskBox);
+        m_eraseBox->setChecked(true);
+        m_eraseBox->setCursor(Qt::PointingHandCursor);
+        m_eraseBox->setToolTip("Paint the masked pixels out of the reference the model sees, so it "
+                               "has to invent that area instead of copying what was there.");
+        maskLayout->addWidget(m_eraseBox);
+
+        QWidget *contextRow = new QWidget(maskBox);
+        QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
+        contextLayout->setContentsMargins(0, 0, 0, 0);
+        contextLayout->setSpacing(8);
+
+        QLabel *contextLabel = new QLabel("Model sees", contextRow);
+        contextLabel->setObjectName("Hint");
+
+        m_contextBox = new QComboBox(contextRow);
+        m_contextBox->addItem("Area + surroundings");
+        m_contextBox->addItem("Whole image");
+        m_contextBox->setToolTip("Area + surroundings crops a window around your mask and renders "
+                                 "it at ~1024 px. Whole image hands over the entire frame at native "
+                                 "scale, with less detail on small masks.");
+
+        contextLayout->addWidget(contextLabel);
+        contextLayout->addWidget(m_contextBox, 1);
+        maskLayout->addWidget(contextRow);
+
+        root->addWidget(maskBox);
+    }
 
     root->addStretch(1);
 
@@ -446,6 +489,10 @@ GenerationRequest ParamPanel::request() const
     req.seed = m_seedLock->isChecked() && !m_seed->text().isEmpty()
                    ? m_seed->text().toLongLong()
                    : qint64(-1);
+    if (m_mode == PageMode::MaskInfill) {
+        req.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
+        req.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
+    }
     return req;
 }
 

@@ -213,6 +213,7 @@ Without `--fp16-unet` every number is ~3.8× worse.
 | node `TextEncodeQwenImage21` rejects `image_1` | autogrow keys are `images.image_N` | use `images.image_1` |
 | composite pastes the whole frame | `ImageCompositeMasked.mask` is optional and defaults to none | wire it |
 | edit shifted / speckled | reference grid mismatch | pass the crop's own size as `resolution` |
+| Job fails with `[Errno 32] Broken pipe` | the engine died mid-job, usually a stale client or an orphaned engine from a killed app | kill leftover `main.py --listen` processes, restart the engine, re-run |
 | 2048² OOM | VAE decode needs ~7 GB | stay at 1024², upscale afterwards |
 
 ---

@@ -76,8 +76,6 @@ private:
     QLabel *m_countBadge;
     QLabel *m_scaleLabel;
     QSize m_scaleTarget;
-    QCheckBox *m_eraseBox;
-    QComboBox *m_contextBox;
     QLabel *m_refsBadge;
     QSlider *m_brushSlider;
     QLabel *m_brushLabel;

@@ -255,36 +255,6 @@ QWidget *CreatePage::buildInputColumn()
         layout->addWidget(scaleRow);
     }
 
-    if (m_mode == PageMode::MaskInfill) {
-        m_eraseBox = new QCheckBox("Regenerate the masked area from scratch", column);
-        m_eraseBox->setChecked(true);
-        m_eraseBox->setCursor(Qt::PointingHandCursor);
-        m_eraseBox->setToolTip("Paint the masked pixels out before the model sees the image, so it "
-                               "has to invent that area instead of copying what was there. "
-                               "Unchecked, the model still sees the original content.");
-        layout->addWidget(m_eraseBox);
-
-        QWidget *contextRow = new QWidget(column);
-        QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
-        contextLayout->setContentsMargins(0, 0, 0, 0);
-        contextLayout->setSpacing(8);
-
-        QLabel *contextLabel = new QLabel("Context", contextRow);
-        contextLabel->setObjectName("Hint");
-
-        m_contextBox = new QComboBox(contextRow);
-        m_contextBox->addItem("Area + surroundings");
-        m_contextBox->addItem("Whole image");
-        m_contextBox->setToolTip("How much of the picture the model may look at while it fills "
-                                 "the mask. Area + surroundings crops a window around your mask; "
-                                 "whole image gives it the full frame at a lower effective detail.");
-
-        contextLayout->addWidget(contextLabel);
-        contextLayout->addStretch(1);
-        contextLayout->addWidget(m_contextBox);
-        layout->addWidget(contextRow);
-    }
-
     layout->addStretch(1);
     return column;
 }
@@ -523,8 +493,6 @@ bool CreatePage::buildRequest(GenerationRequest &request)
                 return false;
             }
             request.maskPath = maskPath;
-            request.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
-            request.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
         } else {
             Logging::warn("No mask painted - the whole image will be regenerated.");
         }

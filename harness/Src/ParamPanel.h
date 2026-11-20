@@ -18,6 +18,9 @@ class QToolButton;
 class ThemeCombo;
 
 /*! Prompt, negative prompt, sampler parameters and the submit button. */
+class QCheckBox;
+class QComboBox;
+
 class ParamPanel : public QWidget
 {
     Q_OBJECT
@@ -71,6 +74,8 @@ private:
     ThemeCombo *m_sampler;
     QPushButton *m_submit;
     QPushButton *m_queue;
+    QCheckBox *m_eraseBox;
+    QComboBox *m_contextBox;
     QLabel *m_count;
 };
 
