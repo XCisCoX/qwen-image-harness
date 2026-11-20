@@ -79,26 +79,28 @@ everything the four workflows collect — a new backend needs nothing else.
 
 ## Mask infill options
 
-Two controls on the Mask infill page decide what the model knows and what it sees:
+Two engines, because they behave very differently on this model:
 
-* **Regenerate the masked area from scratch** (default on). The masked pixels are replaced
-  with the average colour of the surrounding ring in the reference the model receives, so
-  it cannot copy the shape or detail that was there - the Fooocus behaviour, minus the halo
-  a flat grey fill causes against a hard-edged background. Unchecked, the original content stays visible and the model
-  tends to recolour or nudge it instead of replacing it.
-* **Fill: Matched colour / Noise.** What the masked pixels become before the model sees
-  them. Matched colour is a flat fill sampled from the ring around the mask; Noise is the
-  Fooocus behaviour, noise around that tone, which gives the model a texture to start
-  from (fuzzier results, sometimes better fur/skin).
-* **Context: Area + surroundings / Whole image.** Cropping a window around the mask keeps
-  detail high (the crop is rendered at ~1024 px); whole-image mode hands over the entire
-  frame at native scale, at the cost of detail on a small mask.
+* **Edit + paste (default).** The model edits the whole picture with your prompt, and only
+  the painted area is copied back - so materials, shading and highlights survive and
+  everything outside the mask stays pixel-identical. This is what works for "engrave a star
+  into this key", "change this label", "give this mug a handle". Qwen-Image-2.1 is an
+  instruction editor, not an inpainting model.
+* **Latent inpaint (classic).** VAE-encode a crop, mask its latent, sample. The model is
+  handed a hole with no conditioning for what belongs there, so it tends to invent flat
+  content that ignores the surrounding material. Kept for wholesale replacement, where you
+  *want* the old content gone. Its knobs:
+  * **Regenerate from scratch** - replace the masked pixels (matched colour or noise) so the
+    model cannot read the old content. Off: the original stays visible.
+  * **Fill** - matched colour from the ring around the mask, or noise (Fooocus style).
+  * **Strength** - 1.0 replaces the region, 0.4-0.7 modifies it in place. It only helps with
+    the fill *off*: if the content is erased there is nothing left to modify.
+  * **Model sees** - area + surroundings (crop rendered at ~1024 px) or the whole image.
+  * The sampler may also repaint ~12 px beyond the painted area while only painted pixels
+    are pasted back, so it can blend its own edge.
 
-The sampler is also allowed to repaint ~12 px beyond the painted area (the way Fooocus
-does it) while only the painted pixels are pasted back, so the model can blend its own
-edge into the surroundings.
-
-Headless equivalents: `--inpaint-keep`, `--inpaint-fill colour|noise`, `--inpaint-grow N`,
+Headless equivalents: `--inpaint-engine edit|latent`, `--inpaint-keep`,
+`--inpaint-fill colour|noise`, `--inpaint-grow N`, `--inpaint-strength 0.05-1.0`,
 `--inpaint-context full|area`.
 
 ## Mask infill, briefly
