@@ -44,6 +44,10 @@ struct GenerationRequest {
                           //!< image, so it has to invent that content instead of copying it
     int inpaintFill;      //!< MaskInfill: 0 = tone-matched flat colour, 1 = noise (Fooocus)
     int inpaintGrow;      //!< MaskInfill: pixels the sampler may touch beyond the painted area
+    int inpaintEngine;    //!< MaskInfill: 0 = edit the whole image, paste back through the
+                          //!< mask; 1 = classical latent noise-mask sampling on a crop
+    double inpaintStrength; //!< MaskInfill: how far from the original the region may drift
+                            //!< (1.0 = ignore it entirely, 0.4 = engrave/modify in place)
     bool inpaintFullImage;//!< MaskInfill: give the model the whole frame instead of a crop
 
     GenerationRequest()
@@ -57,6 +61,8 @@ struct GenerationRequest {
         , inpaintErase(true)
         , inpaintFill(0)
         , inpaintGrow(12)
+        , inpaintEngine(0)
+        , inpaintStrength(1.0)
         , inpaintFullImage(false)
     {
     }

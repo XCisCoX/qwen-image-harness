@@ -88,6 +88,7 @@ private:
     void closePreviewStream();
     void onPreviewFrame(const QByteArray &message);
     bool prepareMaskedCrop(Job *job, QString *error);
+    bool prepareEditPaste(Job *job, QString *error);
     bool blendMaskedResult(Job *job, const QString &downloadedPath, QString *error);
     void queueJob(Job *job);
     void completeJob(Job *job, const QJsonObject &entry);

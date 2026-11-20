@@ -94,6 +94,11 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     , m_eraseBox(nullptr)
     , m_contextBox(nullptr)
     , m_fillBox(nullptr)
+    , m_engineBox(nullptr)
+    , m_strengthBox(nullptr)
+    , m_fillRow(nullptr)
+    , m_strengthRow(nullptr)
+    , m_ctxRow(nullptr)
     , m_count(nullptr)
 {
     QVBoxLayout *root = new QVBoxLayout(this);
@@ -264,7 +269,25 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
                                "has to invent that area instead of copying what was there.");
         maskLayout->addWidget(m_eraseBox);
 
+        QWidget *engineRow = new QWidget(maskBox);
+        QHBoxLayout *engineLayout = new QHBoxLayout(engineRow);
+        engineLayout->setContentsMargins(0, 0, 0, 0);
+        engineLayout->setSpacing(8);
+        QLabel *engineLabel = new QLabel("Engine", engineRow);
+        engineLabel->setObjectName("Hint");
+        m_engineBox = new QComboBox(engineRow);
+        m_engineBox->addItem("Edit + paste");
+        m_engineBox->addItem("Latent inpaint");
+        m_engineBox->setToolTip("Edit + paste: the model edits the whole picture and only the "
+                                "painted area is copied back. Keeps materials and shading.\n"
+                                "Latent inpaint: classical noise-mask sampling on a crop; "
+                                "replaces the area wholesale, which this model tends to fill flat.");
+        engineLayout->addWidget(engineLabel);
+        engineLayout->addWidget(m_engineBox, 1);
+        maskLayout->addWidget(engineRow);
+
         QWidget *fillRow = new QWidget(maskBox);
+        m_fillRow = fillRow;
         QHBoxLayout *fillLayout = new QHBoxLayout(fillRow);
         fillLayout->setContentsMargins(0, 0, 0, 0);
         fillLayout->setSpacing(8);
@@ -279,12 +302,44 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
         fillLayout->addWidget(m_fillBox, 1);
         maskLayout->addWidget(fillRow);
 
+        QWidget *strengthRow = new QWidget(maskBox);
+        m_strengthRow = strengthRow;
+        QHBoxLayout *strengthLayout = new QHBoxLayout(strengthRow);
+        strengthLayout->setContentsMargins(0, 0, 0, 0);
+        strengthLayout->setSpacing(8);
+        QLabel *strengthLabel = new QLabel("Strength", strengthRow);
+        strengthLabel->setObjectName("Hint");
+        m_strengthBox = new QDoubleSpinBox(strengthRow);
+        m_strengthBox->setRange(0.05, 1.0);
+        m_strengthBox->setSingleStep(0.05);
+        m_strengthBox->setDecimals(2);
+        m_strengthBox->setValue(1.0);
+        m_strengthBox->setToolTip("Latent inpaint only: 1.0 replaces the area, 0.4-0.7 modifies "
+                                  "it in place.");
+        strengthLayout->addWidget(strengthLabel);
+        strengthLayout->addWidget(m_strengthBox, 1);
+        maskLayout->addWidget(strengthRow);
+
+        // The erase/fill/strength/context controls only exist for the latent engine; the
+        // edit engine always edits the whole picture and pastes back through the mask.
+        auto syncEngine = [this](int) {
+            const bool latent = m_engineBox && m_engineBox->currentIndex() == 1;
+            if (m_eraseBox) m_eraseBox->setVisible(latent);
+            if (m_ctxRow) m_ctxRow->setVisible(latent);
+            if (m_fillRow) m_fillRow->setVisible(latent);
+            if (m_strengthRow) m_strengthRow->setVisible(latent);
+            if (m_fillBox) m_fillBox->setEnabled(latent && (!m_eraseBox || m_eraseBox->isChecked()));
+            if (m_strengthBox) m_strengthBox->setEnabled(latent);
+        };
+        connect(m_engineBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+                this, [syncEngine](int i) { syncEngine(i); });
         connect(m_eraseBox, &QCheckBox::toggled, this, [this](bool on) {
             if (m_fillBox)
                 m_fillBox->setEnabled(on);
         });
 
         QWidget *contextRow = new QWidget(maskBox);
+        m_ctxRow = contextRow;
         QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
         contextLayout->setContentsMargins(0, 0, 0, 0);
         contextLayout->setSpacing(8);
@@ -302,6 +357,8 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
         contextLayout->addWidget(contextLabel);
         contextLayout->addWidget(m_contextBox, 1);
         maskLayout->addWidget(contextRow);
+
+        syncEngine(0);
 
         root->addWidget(maskBox);
     }
@@ -513,6 +570,8 @@ GenerationRequest ParamPanel::request() const
     if (m_mode == PageMode::MaskInfill) {
         req.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
         req.inpaintFill = (m_fillBox && m_fillBox->currentIndex() == 1) ? 1 : 0;
+        req.inpaintEngine = (m_engineBox && m_engineBox->currentIndex() == 1) ? 1 : 0;
+        req.inpaintStrength = m_strengthBox ? m_strengthBox->value() : 1.0;
         req.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
     }
     return req;

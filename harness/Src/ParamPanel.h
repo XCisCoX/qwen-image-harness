@@ -77,6 +77,11 @@ private:
     QCheckBox *m_eraseBox;
     QComboBox *m_contextBox;
     QComboBox *m_fillBox;
+    QComboBox *m_engineBox;
+    QDoubleSpinBox *m_strengthBox;
+    QWidget *m_fillRow;
+    QWidget *m_strengthRow;
+    QWidget *m_ctxRow;
     QLabel *m_count;
 };
 

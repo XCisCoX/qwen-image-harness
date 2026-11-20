@@ -64,6 +64,8 @@ int runHeadless(QApplication &app, const QCommandLineParser &parser, PageMode mo
         req.inpaintErase = !parser.isSet("inpaint-keep");
         req.inpaintFill = (parser.value("inpaint-fill").toLower() == "noise") ? 1 : 0;
         req.inpaintGrow = parser.value("inpaint-grow").toInt();
+        req.inpaintStrength = parser.value("inpaint-strength").toDouble();
+        req.inpaintEngine = (parser.value("inpaint-engine").toLower() == "latent") ? 1 : 0;
         const QString context = parser.value("inpaint-context").toLower();
         req.inpaintFullImage = (context == "full" || context == "whole");
     }
@@ -161,6 +163,12 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption("inpaint-grow",
         "Mask mode: let the sampler repaint N px beyond the painted area (default 0).",
         "N", "0"));
+    parser.addOption(QCommandLineOption("inpaint-engine",
+        "Mask mode: 'edit' (default, edit whole image then paste through the mask) or 'latent'.",
+        "edit|latent", "edit"));
+    parser.addOption(QCommandLineOption("inpaint-strength",
+        "Mask mode: 1.0 replaces the region, 0.4-0.7 modifies it in place (default 1.0).",
+        "0.05-1.0", "1.0"));
     parser.addOption(QCommandLineOption("inpaint-context",
         "Mask mode: 'area' (crop + surroundings, default) or 'full' (whole frame).",
         "area|full", "area"));

@@ -47,6 +47,26 @@ const char *kTurboSigmas = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, "
                            "0.845148, 0.704534, 0.414568, 0";
 
 const char *kTurboModel = "qwen-image-2.1-turbo-Q4_K_M.gguf";
+
+// The turbo schedule is front-loaded (1.0, 0.978, 0.954 ...), so truncating it the
+// way "denoise" does leaves a starting sigma of 0.95 - still almost pure noise. Scaling
+// keeps every step but starts at a lower noise level, which is what "strength" means in
+// Fooocus: the original latent inside the mask survives as a starting point and the
+// model modifies it (engrave a logo, recolour metal) instead of inventing a flat patch.
+QString scaledSigmas(const char *base, double strength)
+{
+    const double s = qBound(0.05, strength, 1.0);
+    QStringList out;
+    for (const QString &piece : QString::fromLatin1(base).split(',', Qt::SkipEmptyParts)) {
+        const QString t = piece.trimmed();
+        const double v = t.toDouble();
+        // Keep the terminal 0 so the sampler still finishes at zero noise.
+        out.append(v <= 0.0 ? QStringLiteral("0")
+                            : QString::number(v * s, 'g', 6));
+    }
+    return out.join(QStringLiteral(", "));
+}
+
 const char *kBaseModel = "qwen_image_2.1-Q4_K_M.gguf";
 const char *kStockTe = "qwen3vl_8b_w4a8.safetensors";
 const char *kHereticTe = "qwen3vl_8b_w4a8_heretic.safetensors";
@@ -711,7 +731,11 @@ QJsonObject ComfyBackend::buildGraph(const Job &job) const
     const GenerationRequest &r = job.req;
     const bool turbo = job.modelFile.contains("turbo");
     const int side = qMax(r.size.width(), r.size.height());
-    const bool masked = r.mode == PageMode::MaskInfill && !job.maskName.isEmpty();
+    // "masked" means latent noise-mask sampling. The default engine edits the whole
+    // image instead (Qwen has no inpaint conditioning, so a noised hole gets filled
+    // with flat invented content) and pastes the result back through the mask.
+    const bool masked = r.mode == PageMode::MaskInfill && !job.maskName.isEmpty()
+                        && r.inpaintEngine == 1;
 
     QJsonObject g;
     g.insert("1", obj({{"class_type", "UnetLoaderGGUF"},
@@ -772,7 +796,8 @@ QJsonObject ComfyBackend::buildGraph(const Job &job) const
         g.insert("6", obj({{"class_type", "KSamplerSelect"},
                            {"inputs", obj({{"sampler_name", "euler"}})}}));
         g.insert("7", obj({{"class_type", "ManualSigmas"},
-                           {"inputs", obj({{"sigmas", QString::fromLatin1(kTurboSigmas)}})}}));
+                           {"inputs", obj({{"sigmas", masked ? scaledSigmas(kTurboSigmas, r.inpaintStrength)
+                                               : QString::fromLatin1(kTurboSigmas)}})}}));
         g.insert("8", obj({{"class_type", "BasicGuider"},
                            {"inputs", obj({{"model", link("1", 0)},
                                            {"conditioning", link("4", 0)}})}}));
@@ -793,7 +818,7 @@ QJsonObject ComfyBackend::buildGraph(const Job &job) const
                                            {"cfg", r.cfg},
                                            {"sampler_name", mapSampler(r.sampler)},
                                            {"scheduler", "simple"},
-                                           {"denoise", 1.0}})}}));
+                                           {"denoise", masked ? qBound(0.05, r.inpaintStrength, 1.0) : 1.0}})}}));
     }
 
     g.insert("10", obj({{"class_type", "VAEDecode"},
@@ -1046,6 +1071,14 @@ void ComfyBackend::beginUploads(Job *job)
     QString maskSource = job->req.maskPath;
 
     if (job->req.mode == PageMode::MaskInfill && !maskSource.isEmpty()
+        && QFileInfo::exists(maskSource) && !sources.isEmpty()
+        && job->req.inpaintEngine == 0) {
+        QString error;
+        if (!prepareEditPaste(job, &error)) {
+            failJob(job, QString("Mask infill setup failed: %1").arg(error));
+            return;
+        }
+    } else if (job->req.mode == PageMode::MaskInfill && !maskSource.isEmpty()
         && QFileInfo::exists(maskSource) && !sources.isEmpty()) {
         QString error;
         if (!prepareMaskedCrop(job, &error)) {
@@ -1142,6 +1175,40 @@ void ComfyBackend::pollJobs()
         completeJob(job, history.value(job->promptId).toObject());
         return; // job map changed
     }
+}
+
+// Edit-and-paste engine: the model sees the whole picture (its strength - Qwen-Image
+// follows instructions over a full frame far better than it fills a noised hole), and the
+// result is pasted back through the mask so everything outside stays pixel-identical.
+bool ComfyBackend::prepareEditPaste(Job *job, QString *error)
+{
+    const QString primary = job->req.images.value(0);
+    job->originalPath = primary;
+
+    QImage original(primary);
+    QImage mask(job->req.maskPath);
+    if (original.isNull() || mask.isNull()) {
+        *error = QString("Cannot read %1 or the mask").arg(QFileInfo(primary).fileName());
+        return false;
+    }
+    if (mask.size() != original.size())
+        mask = mask.scaled(original.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+    const QImage gray = mask.convertToFormat(QImage::Format_Grayscale8);
+    if (maskBounds(gray).isNull()) {
+        *error = "the mask is empty";
+        return false;
+    }
+
+    // Whole frame, snapped to the VAE grid so the paste lines up with no resampling.
+    const QRect rect(0, 0, qMax(64, (original.width() / 16) * 16),
+                     qMax(64, (original.height() / 16) * 16));
+    job->cropRect = rect;
+    job->featherMask = gray.copy(rect);
+    job->workSize = rect.size();
+    log(QString("Infill: edit-and-paste engine, model edits %1x%2, mask pasted back")
+            .arg(rect.width()).arg(rect.height()));
+    return true;
 }
 
 bool ComfyBackend::blendMaskedResult(Job *job, const QString &downloadedPath, QString *error)
