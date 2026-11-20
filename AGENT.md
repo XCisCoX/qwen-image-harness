@@ -265,3 +265,13 @@ If you have your own model service, implement `submit()` against its API, emit
 * list the versions you installed and the gates you passed;
 * if you changed a path or port away from the defaults, write it down — the next person
   will not guess.
+
+## GUI testing
+
+`harness/gui-check.sh` starts a nested Xephyr plus `matchbox-window-manager` and launches
+the app on it. The window manager is not optional: without one Qt maps file dialogs at 0x0
+with keyboard focus, so the UI renders but stops responding to clicks.
+
+    sudo apt-get install -y matchbox-window-manager xserver-xephyr
+    ./harness/gui-check.sh            # display :99, WM, app
+    DISPLAY=:99 import -window root shot.png
