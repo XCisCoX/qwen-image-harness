@@ -1,4 +1,4 @@
-QT += core gui widgets network websockets
+QT += core gui widgets network websockets svg
 
 TARGET   = QwenImageHarness
 TEMPLATE = app
@@ -18,6 +18,7 @@ SOURCES += \
     ImageSlots.cpp \
     Log.cpp \
     MaskCanvas.cpp \
+    MaskFullView.cpp \
     MockBackend.cpp \
     OutputPane.cpp \
     ParamPanel.cpp \
@@ -40,6 +41,7 @@ HEADERS += \
     ImageSlots.h \
     Log.h \
     MaskCanvas.h \
+    MaskFullView.h \
     MockBackend.h \
     OutputPane.h \
     ParamPanel.h \

@@ -156,7 +156,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     m_width = new QSpinBox(sizeRow);
     m_width->setRange(256, 2048);
     m_width->setSingleStep(64);
-    m_width->setFixedWidth(72);
+    m_width->setFixedWidth(64);
     m_width->setSuffix("");
     sizeLayout->addWidget(m_width);
 
@@ -167,7 +167,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     m_height = new QSpinBox(sizeRow);
     m_height->setRange(256, 2048);
     m_height->setSingleStep(64);
-    m_height->setFixedWidth(72);
+    m_height->setFixedWidth(64);
     sizeLayout->addWidget(m_height);
 
     QWidget *sizeField = field("Size", sizeRow);
@@ -185,7 +185,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
 
     m_steps = new QSpinBox(stepsRow);
     m_steps->setRange(4, 80);
-    m_steps->setFixedWidth(56);
+    m_steps->setFixedWidth(52);
     stepsLayout->addWidget(m_steps);
     grid->addWidget(field("Steps", stepsRow), 1, 0);
 

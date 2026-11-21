@@ -99,6 +99,13 @@ Two engines, because they behave very differently on this model:
   * The sampler may also repaint ~12 px beyond the painted area while only painted pixels
     are pasted back, so it can blend its own edge.
 
+The mask editor has a full-view mode: the expand button in its toolbar (or `F`) moves the
+canvas and its controls into a window-filling view; `Esc` or *Close* puts everything back on
+the page with the mask intact.
+
+Both the Compose column and the mask column scroll instead of squashing when the window is
+short.
+
 Headless equivalents: `--inpaint-engine edit|latent`, `--inpaint-keep`,
 `--inpaint-fill colour|noise`, `--inpaint-grow N`, `--inpaint-strength 0.05-1.0`,
 `--inpaint-context full|area`.

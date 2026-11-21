@@ -4,6 +4,7 @@
 #include "ImageSlots.h"
 #include "Log.h"
 #include "MaskCanvas.h"
+#include "MaskFullView.h"
 #include "OutputPane.h"
 #include "ParamPanel.h"
 #include "Settings.h"
@@ -98,6 +99,10 @@ CreatePage::CreatePage(PageMode mode, QWidget *parent)
     , m_mode(mode)
     , m_images(nullptr)
     , m_canvas(nullptr)
+    , m_maskCard(nullptr)
+    , m_maskToolbar(nullptr)
+    , m_fullPlaceholder(nullptr)
+    , m_fullView(nullptr)
     , m_params(nullptr)
     , m_output(nullptr)
     , m_countBadge(nullptr)
@@ -267,6 +272,7 @@ QWidget *CreatePage::buildMaskColumn()
     layout->setSpacing(10);
 
     Card *maskCard = new Card("Mask editor", column);
+    m_maskCard = maskCard;
 
     QPushButton *pick = new QPushButton("Choose image", maskCard);
     pick->setObjectName("Ghost");
@@ -278,7 +284,8 @@ QWidget *CreatePage::buildMaskColumn()
     m_canvas = new MaskCanvas(maskCard);
     m_canvas->setMinimumHeight(160);
     maskCard->body()->addWidget(m_canvas, 1);
-    maskCard->body()->addWidget(buildMaskToolbar(maskCard));
+    m_maskToolbar = buildMaskToolbar(maskCard);
+    maskCard->body()->addWidget(m_maskToolbar);
     maskCard->setMinimumHeight(330);
 
     connect(m_canvas, &MaskCanvas::browseRequested, this, &CreatePage::chooseBaseImage);
@@ -299,6 +306,10 @@ QWidget *CreatePage::buildMaskColumn()
     QShortcut *undoShortcut = new QShortcut(QKeySequence::Undo, m_canvas);
     undoShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(undoShortcut, &QShortcut::activated, this, [this]() { m_canvas->undo(); });
+
+    QShortcut *fullViewShortcut = new QShortcut(QKeySequence(Qt::Key_F), this);
+    fullViewShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(fullViewShortcut, &QShortcut::activated, this, &CreatePage::enterMaskFullView);
 
     QShortcut *redoShortcut = new QShortcut(QKeySequence::Redo, m_canvas);
     redoShortcut->setContext(Qt::WidgetWithChildrenShortcut);
@@ -334,7 +345,17 @@ QWidget *CreatePage::buildMaskColumn()
     leftSplit->setStretchFactor(1, 0);
     leftSplit->setSizes(QList<int>() << 460 << 180);
 
-    layout->addWidget(leftSplit, 1);
+    // Keep both cards usable: below this the splitter scrolls rather than squashing
+    // the canvas and the reference grid out of shape.
+    leftSplit->setMinimumHeight(520);
+
+    QScrollArea *columnScroll = new QScrollArea(column);
+    columnScroll->setObjectName("MaskColumnScroll");
+    columnScroll->setWidgetResizable(true);
+    columnScroll->setFrameShape(QFrame::NoFrame);
+    columnScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    columnScroll->setWidget(leftSplit);
+    layout->addWidget(columnScroll, 1);
 
     return column;
 }
@@ -402,7 +423,7 @@ QWidget *CreatePage::buildMaskToolbar(QWidget *parent)
     m_undoButton = toolIcon(bar, Icons::Undo, "Undo (Ctrl+Z)");
     m_redoButton = toolIcon(bar, Icons::Redo, "Redo (Ctrl+Y)");
     m_clearButton = toolIcon(bar, Icons::Trash, "Clear mask");
-    m_invertButton = toolIcon(bar, Icons::Refresh, "Invert mask");
+    m_invertButton = toolIcon(bar, Icons::Contrast, "Invert mask");
     second->addWidget(m_undoButton);
     second->addWidget(m_redoButton);
     second->addWidget(m_clearButton);
@@ -425,6 +446,10 @@ QWidget *CreatePage::buildMaskToolbar(QWidget *parent)
 
     second->addStretch(1);
 
+    QToolButton *expand = toolIcon(bar, Icons::Expand, "Full view (F)");
+    connect(expand, &QToolButton::clicked, this, &CreatePage::enterMaskFullView);
+    second->addWidget(expand);
+
     outer->addLayout(second);
 
     QLabel *hint = new QLabel("White is regenerated. The mask stays separate from the 16 images.", bar);
@@ -446,13 +471,69 @@ QWidget *CreatePage::buildCenterColumn()
     Card *card = new Card("Compose", column);
 
     m_params = new ParamPanel(m_mode, card);
-    m_params->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-    card->body()->addWidget(m_params, 1);
+    m_params->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+    m_params->setMinimumWidth(0);
+
+    // Short windows used to squeeze the fields until they overlapped. The panel keeps
+    // its natural height and the card scrolls instead.
+    QScrollArea *paramsScroll = new QScrollArea(card);
+    paramsScroll->setObjectName("ParamsScroll");
+    paramsScroll->setWidgetResizable(true);
+    paramsScroll->setFrameShape(QFrame::NoFrame);
+    // Vertical scrolling only: the panel is laid out to fit the narrow column, so a
+    // horizontal bar would mean a layout bug rather than something the user can fix.
+    paramsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    paramsScroll->setWidget(m_params);
+    card->body()->addWidget(paramsScroll, 1);
 
     layout->addWidget(card, 1);
 
     m_params->setBackendReady(m_backendReady);
     return column;
+}
+
+void CreatePage::enterMaskFullView()
+{
+    if (!m_canvas || !m_maskCard || (m_fullView && m_fullView->isHosting()))
+        return;
+
+    if (!m_fullView) {
+        m_fullView = new MaskFullView(this);
+        connect(m_fullView, &MaskFullView::closing, this, &CreatePage::leaveMaskFullView);
+    }
+
+    // Keep the card's layout intact while the editor is away, so nothing collapses
+    // behind it and the widget has a slot to come back to.
+    if (!m_fullPlaceholder) {
+        m_fullPlaceholder = new QWidget(m_maskCard);
+        m_fullPlaceholder->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    }
+    const int canvasIndex = m_maskCard->body()->indexOf(m_canvas);
+    if (canvasIndex >= 0)
+        m_maskCard->body()->insertWidget(canvasIndex, m_fullPlaceholder);
+    m_canvas->hide();
+    m_fullPlaceholder->show();
+
+    m_fullView->showEditor(m_canvas, m_maskToolbar, window()->geometry());
+}
+
+void CreatePage::leaveMaskFullView()
+{
+    if (!m_fullView || !m_fullView->isHosting())
+        return;
+    m_fullView->releaseEditor();
+
+    if (m_fullPlaceholder) {
+        m_maskCard->body()->removeWidget(m_fullPlaceholder);
+        m_fullPlaceholder->hide();
+    }
+    m_maskCard->body()->insertWidget(0, m_canvas);
+    if (m_maskToolbar)
+        m_maskCard->body()->insertWidget(1, m_maskToolbar);
+    m_canvas->show();
+    if (m_maskToolbar)
+        m_maskToolbar->show();
+    m_canvas->fitToView();
 }
 
 void CreatePage::showPreview(const QImage &image)

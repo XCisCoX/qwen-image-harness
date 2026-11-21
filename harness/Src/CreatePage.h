@@ -9,6 +9,7 @@
 #include <QWidget>
 
 class Card;
+class MaskFullView;
 class QCheckBox;
 class QComboBox;
 class ImageSlots;
@@ -36,6 +37,8 @@ public:
     void setProgress(int percent, const QString &stage);
     void showResult(const GenerationResult &result);
     void showPreview(const QImage &image);
+    void enterMaskFullView();
+    void leaveMaskFullView();
     void removePath(const QString &path);
     void clearOutput();
     QStringList currentPaths() const;
@@ -73,6 +76,10 @@ private:
     PageMode m_mode;
     ImageSlots *m_images;
     MaskCanvas *m_canvas;
+    Card *m_maskCard;
+    QWidget *m_maskToolbar;
+    QWidget *m_fullPlaceholder;
+    MaskFullView *m_fullView;
     ParamPanel *m_params;
     OutputPane *m_output;
     QLabel *m_countBadge;

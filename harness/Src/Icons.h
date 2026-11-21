@@ -54,7 +54,9 @@ enum Id {
     ArrowLeft,
     ArrowRight,
     Download,
-    Layers
+    Layers,
+    Expand,
+    Contrast
 };
 
 QPixmap pixmap(Id id, int size, const QColor &color);
