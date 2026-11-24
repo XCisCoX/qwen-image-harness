@@ -62,6 +62,13 @@ int runHeadless(QApplication &app, const QCommandLineParser &parser, PageMode mo
             return 2;
         }
         req.maskPath = QFileInfo(parser.value("mask")).absoluteFilePath();
+        req.inpaintErase = !parser.isSet("inpaint-keep");
+        req.inpaintFill = (parser.value("inpaint-fill").toLower() == "noise") ? 1 : 0;
+        req.inpaintGrow = parser.value("inpaint-grow").toInt();
+        req.inpaintStrength = parser.value("inpaint-strength").toDouble();
+        req.inpaintEngine = (parser.value("inpaint-engine").toLower() == "latent") ? 1 : 0;
+        const QString context = parser.value("inpaint-context").toLower();
+        req.inpaintFullImage = (context == "full" || context == "whole");
     }
 
     Backend *backend = createBackend(&app);
@@ -149,6 +156,23 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption("image", "Primary image (edit/faceswap/mask).", "path"));
     parser.addOption(QCommandLineOption("ref", "Reference image; repeatable.", "path"));
     parser.addOption(QCommandLineOption("mask", "Mask PNG, white = regenerate.", "path"));
+    parser.addOption(QCommandLineOption("inpaint-keep",
+        "Mask mode: let the model see the original content under the mask (default: erased)."));
+    parser.addOption(QCommandLineOption("inpaint-fill",
+        "Mask mode fill: 'colour' (tone-matched flat, default) or 'noise' (Fooocus style).",
+        "colour|noise", "colour"));
+    parser.addOption(QCommandLineOption("inpaint-grow",
+        "Mask mode: let the sampler repaint N px beyond the painted area (default 0).",
+        "N", "0"));
+    parser.addOption(QCommandLineOption("inpaint-engine",
+        "Mask mode: 'edit' (default, edit whole image then paste through the mask) or 'latent'.",
+        "edit|latent", "edit"));
+    parser.addOption(QCommandLineOption("inpaint-strength",
+        "Mask mode: 1.0 replaces the region, 0.4-0.7 modifies it in place (default 1.0).",
+        "0.05-1.0", "1.0"));
+    parser.addOption(QCommandLineOption("inpaint-context",
+        "Mask mode: 'area' (crop + surroundings, default) or 'full' (whole frame).",
+        "area|full", "area"));
     parser.addOption(QCommandLineOption("negative", "Negative prompt.", "text", ""));
     parser.addOption(QCommandLineOption("size", "Square size in pixels.", "px", "1024"));
     parser.addOption(QCommandLineOption("steps", "Sampling steps (<=12 picks the turbo checkpoint).", "n", "8"));

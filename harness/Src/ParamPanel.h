@@ -18,6 +18,9 @@ class QToolButton;
 class ThemeCombo;
 
 /*! Prompt, negative prompt, sampler parameters and the submit button. */
+class QCheckBox;
+class QComboBox;
+
 class ParamPanel : public QWidget
 {
     Q_OBJECT
@@ -36,6 +39,7 @@ public:
 
 signals:
     void submitRequested();
+    void queueRequested();
 
 private slots:
     void onSizePresetChanged(int index);
@@ -69,6 +73,15 @@ private:
     QSpinBox *m_batch;
     ThemeCombo *m_sampler;
     QPushButton *m_submit;
+    QPushButton *m_queue;
+    QCheckBox *m_eraseBox;
+    QComboBox *m_contextBox;
+    QComboBox *m_fillBox;
+    QComboBox *m_engineBox;
+    QDoubleSpinBox *m_strengthBox;
+    QWidget *m_fillRow;
+    QWidget *m_strengthRow;
+    QWidget *m_ctxRow;
     QLabel *m_count;
 };
 

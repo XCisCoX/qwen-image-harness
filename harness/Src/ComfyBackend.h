@@ -3,6 +3,8 @@
 
 #include <QElapsedTimer>
 #include <QImage>
+
+class QWebSocket;
 #include <QRect>
 #include <QHash>
 #include <QNetworkAccessManager>
@@ -82,7 +84,11 @@ private:
 
     // --- job pipeline --------------------------------------------------------
     void beginUploads(Job *job);
+    void openPreviewStream();
+    void closePreviewStream();
+    void onPreviewFrame(const QByteArray &message);
     bool prepareMaskedCrop(Job *job, QString *error);
+    bool prepareEditPaste(Job *job, QString *error);
     bool blendMaskedResult(Job *job, const QString &downloadedPath, QString *error);
     void queueJob(Job *job);
     void completeJob(Job *job, const QJsonObject &entry);
@@ -100,6 +106,8 @@ private:
 
     QNetworkAccessManager *m_net;
     QProcess *m_proc;
+    QWebSocket *m_ws;
+    QString m_wsClientId;
     QTimer *m_health;
     QTimer *m_poll;
     int m_port;

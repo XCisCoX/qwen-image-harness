@@ -2,6 +2,7 @@
 #define BACKEND_H
 
 #include <QMetaType>
+#include <QImage>
 #include <QObject>
 #include <QSize>
 #include <QString>
@@ -39,6 +40,15 @@ struct GenerationRequest {
     qint64 seed;          //!< -1 means "pick one"
     QStringList images;
     QString maskPath;     //!< only for MaskInfill
+    bool inpaintErase;    //!< MaskInfill: paint the masked area out before the model sees the
+                          //!< image, so it has to invent that content instead of copying it
+    int inpaintFill;      //!< MaskInfill: 0 = tone-matched flat colour, 1 = noise (Fooocus)
+    int inpaintGrow;      //!< MaskInfill: pixels the sampler may touch beyond the painted area
+    int inpaintEngine;    //!< MaskInfill: 0 = edit the whole image, paste back through the
+                          //!< mask; 1 = classical latent noise-mask sampling on a crop
+    double inpaintStrength; //!< MaskInfill: how far from the original the region may drift
+                            //!< (1.0 = ignore it entirely, 0.4 = engrave/modify in place)
+    bool inpaintFullImage;//!< MaskInfill: give the model the whole frame instead of a crop
 
     GenerationRequest()
         : mode(PageMode::Generate)
@@ -48,6 +58,12 @@ struct GenerationRequest {
         , batch(1)
         , sampler("Euler")
         , seed(-1)
+        , inpaintErase(true)
+        , inpaintFill(0)
+        , inpaintGrow(12)
+        , inpaintEngine(0)
+        , inpaintStrength(1.0)
+        , inpaintFullImage(false)
     {
     }
 
@@ -112,6 +128,9 @@ public:
     virtual void discardImage(const QString &imagePath);
 
 signals:
+    //! A live frame from the engine's sampler (only while a job is running).
+    void previewReady(const QImage &image);
+
     void stateChanged(int state);
     void progress(const QString &jobId, int percent, const QString &stage);
     void jobFinished(const GenerationResult &result);

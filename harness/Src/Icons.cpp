@@ -61,7 +61,7 @@ QPixmap pixmap(Id id, int size, const QColor &color)
     p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     p.scale(size / 24.0, size / 24.0);
 
-    QPen pen(color, 1.7);
+    QPen pen(color, 1.9);
     pen.setCapStyle(Qt::RoundCap);
     pen.setJoinStyle(Qt::RoundJoin);
     p.setPen(pen);
@@ -231,7 +231,14 @@ QPixmap pixmap(Id id, int size, const QColor &color)
         p.drawPath(back);
         break;
     }
-    case Save:
+    case Save: {
+        // a floppy, not a download arrow: "save the mask" and "download" were the same glyph
+        p.drawRoundedRect(QRectF(4.4, 4.4, 15.2, 15.2), 2.4, 2.4);
+        p.drawPolyline(QPolygonF() << QPointF(8.8, 4.4) << QPointF(8.8, 9.6)
+                                   << QPointF(15.2, 9.6) << QPointF(15.2, 4.4));
+        p.drawRoundedRect(QRectF(8.4, 13.2, 7.2, 6.4), 1.0, 1.0);
+        break;
+    }
     case Download: {
         p.drawLine(QPointF(12, 4.2), QPointF(12, 15.0));
         p.drawPolyline(QPolygonF() << QPointF(7.4, 10.4) << QPointF(12.0, 15.0) << QPointF(16.6, 10.4));
@@ -240,30 +247,47 @@ QPixmap pixmap(Id id, int size, const QColor &color)
         break;
     }
     case Undo: {
-        p.drawArc(QRectF(6.5, 7.0, 12.0, 11.0), 100 * 16, 250 * 16);
-        arrowHead(p, QPointF(7.0, 8.4), QPointF(-0.2, -0.98), 4.6);
+        p.drawPolyline(QPolygonF() << QPointF(9.0, 4.6) << QPointF(4.2, 9.4) << QPointF(9.0, 14.2));
+        QPainterPath u;
+        u.moveTo(4.2, 9.4);
+        u.lineTo(14.8, 9.4);
+        u.cubicTo(18.4, 9.4, 20.0, 12.2, 20.0, 14.8);
+        u.cubicTo(20.0, 17.6, 18.0, 19.6, 15.2, 19.6);
+        u.lineTo(11.8, 19.6);
+        p.drawPath(u);
         break;
     }
     case Redo: {
-        p.drawArc(QRectF(5.5, 7.0, 12.0, 11.0), 80 * 16, -250 * 16);
-        arrowHead(p, QPointF(17.0, 8.4), QPointF(0.2, -0.98), 4.6);
+        p.drawPolyline(QPolygonF() << QPointF(15.0, 4.6) << QPointF(19.8, 9.4) << QPointF(15.0, 14.2));
+        QPainterPath r;
+        r.moveTo(19.8, 9.4);
+        r.lineTo(9.2, 9.4);
+        r.cubicTo(5.6, 9.4, 4.0, 12.2, 4.0, 14.8);
+        r.cubicTo(4.0, 17.6, 6.0, 19.6, 8.8, 19.6);
+        r.lineTo(12.2, 19.6);
+        p.drawPath(r);
         break;
     }
     case Brush: {
-        p.drawEllipse(QPointF(8.6, 15.4), 3.3, 3.3);
-        p.drawLine(QPointF(10.9, 13.1), QPointF(18.6, 5.4));
-        p.drawLine(QPointF(17.2, 4.0), QPointF(20.0, 6.8));
+        // handle plus a bristle wedge: at 16 px the old dot-and-stick read as a pin
+        p.drawLine(QPointF(10.2, 13.8), QPointF(19.2, 4.8));
+        QPainterPath bristle;
+        bristle.moveTo(3.8, 20.2);
+        bristle.lineTo(6.4, 13.2);
+        bristle.lineTo(10.8, 17.6);
+        bristle.closeSubpath();
+        p.fillPath(bristle, color);
         break;
     }
     case Eraser: {
-        QPainterPath e;
-        e.moveTo(3.6, 14.6);
-        e.lineTo(10.4, 5.6);
-        e.lineTo(19.2, 11.4);
-        e.lineTo(12.2, 20.0);
-        e.closeSubpath();
-        p.drawPath(e);
-        p.drawLine(QPointF(7.4, 17.6), QPointF(14.6, 10.4));
+        // the familiar slanted block with the band and the line it leaves behind
+        p.save();
+        p.translate(12.0, 11.2);
+        p.rotate(-45.0);
+        p.drawRoundedRect(QRectF(-6.4, -3.5, 12.8, 7.0), 1.7, 1.7);
+        p.drawLine(QPointF(0.6, -3.5), QPointF(0.6, 3.5));
+        p.restore();
+        p.drawLine(QPointF(8.4, 20.4), QPointF(20.0, 20.4));
         break;
     }
     case Image: {
@@ -332,6 +356,24 @@ QPixmap pixmap(Id id, int size, const QColor &color)
         p.drawPolyline(QPolygonF() << QPointF(15.0, 4.5) << QPointF(19.5, 4.5) << QPointF(19.5, 9.0));
         p.drawPolyline(QPolygonF() << QPointF(19.5, 15.0) << QPointF(19.5, 19.5) << QPointF(15.0, 19.5));
         p.drawPolyline(QPolygonF() << QPointF(9.0, 19.5) << QPointF(4.5, 19.5) << QPointF(4.5, 15.0));
+        break;
+    }
+    case Expand: {
+        // maximise-2: two diagonal arrows leaving the frame
+        p.drawPolyline(QPolygonF() << QPointF(15.0, 3.0) << QPointF(21.0, 3.0) << QPointF(21.0, 9.0));
+        p.drawPolyline(QPolygonF() << QPointF(9.0, 21.0) << QPointF(3.0, 21.0) << QPointF(3.0, 15.0));
+        p.drawLine(QPointF(21.0, 3.0), QPointF(14.0, 10.0));
+        p.drawLine(QPointF(3.0, 21.0), QPointF(10.0, 14.0));
+        break;
+    }
+    case Contrast: {
+        // half-filled disc reads as "invert" without a rotation metaphor
+        p.drawEllipse(QPointF(12.0, 12.0), 8.4, 8.4);
+        QPainterPath half;
+        half.moveTo(12.0, 3.6);
+        half.arcTo(QRectF(3.6, 3.6, 16.8, 16.8), 90.0, -180.0);
+        half.closeSubpath();
+        p.fillPath(half, color);
         break;
     }
     case Server: {

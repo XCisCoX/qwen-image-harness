@@ -5,9 +5,13 @@
 #include "Settings.h"
 
 #include <QSize>
+#include <QImage>
 #include <QWidget>
 
 class Card;
+class MaskFullView;
+class QCheckBox;
+class QComboBox;
 class ImageSlots;
 class MaskCanvas;
 class OutputPane;
@@ -32,6 +36,9 @@ public:
     void setBusy(bool busy);
     void setProgress(int percent, const QString &stage);
     void showResult(const GenerationResult &result);
+    void showPreview(const QImage &image);
+    void enterMaskFullView();
+    void leaveMaskFullView();
     void removePath(const QString &path);
     void clearOutput();
     QStringList currentPaths() const;
@@ -41,6 +48,7 @@ public:
 
 signals:
     void submitRequested(const GenerationRequest &request, const QString &pageId);
+    void queueRequested(const GenerationRequest &request, const QString &pageId);
     void viewRequested(const QStringList &paths, int index);
     void revealRequested(const QString &path);
     void galleryRequested();
@@ -49,12 +57,14 @@ signals:
 
 private slots:
     void onSubmit();
+    void onQueue();
     void updateCounts();
     void updateMaskButtons();
     void chooseBaseImage();
     void chooseMaskFile();
     void saveMaskFile();
     void promptScale();
+    bool buildRequest(GenerationRequest &request);
 
 private:
     QWidget *buildHeader();
@@ -66,6 +76,10 @@ private:
     PageMode m_mode;
     ImageSlots *m_images;
     MaskCanvas *m_canvas;
+    Card *m_maskCard;
+    QWidget *m_maskToolbar;
+    QWidget *m_fullPlaceholder;
+    MaskFullView *m_fullView;
     ParamPanel *m_params;
     OutputPane *m_output;
     QLabel *m_countBadge;

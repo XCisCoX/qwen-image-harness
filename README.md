@@ -19,13 +19,15 @@ harness or API subscription, wire it there and keep the entire interface.
 | Generate | prompt → image, 1–16 reference images |
 | Edit | change a photo with instructions, optional extra references |
 | Face swap | identity transfer, same request shape as edit |
-| Mask infill | paint a mask, re-render only that area (crop + context + noise mask) |
+| Mask infill | paint a mask, re-render only that area — from scratch or keeping the original |
 | Gallery | everything in the output folder, newest first |
 | Terminal | the engine's log and this app's own backend messages |
 | Settings | paths, server command, defaults, retention, accent colour |
 
 Also: **on-the-fly scaling** of the primary image (defaults to ~1.0 MP, keeps aspect),
-batch, seed lock, per-run JSON sidecars, and a headless mode for scripting.
+**a prompt queue** (submit as many as you like, they run in order), **optional live
+preview** of the sampler, batch, seed lock,
+per-run JSON sidecars, and a headless mode for scripting.
 
 Unofficial community project. Not affiliated with, endorsed by, or supported by Alibaba or
 the Qwen team; "Qwen" is their trademark and is used here only to say what the app runs.
@@ -124,6 +126,39 @@ harness/docs/BACKEND.md        the request/result shapes and the rules
 an ordered image list (`images[0]` is the primary) and an optional mask path. That is
 everything the four workflows collect — a new backend needs nothing else.
 
+## Mask infill options
+
+Two engines, because they behave very differently on this model:
+
+* **Edit + paste (default).** The model edits the whole picture with your prompt, and only
+  the painted area is copied back - so materials, shading and highlights survive and
+  everything outside the mask stays pixel-identical. This is what works for "engrave a star
+  into this key", "change this label", "give this mug a handle". Qwen-Image-2.1 is an
+  instruction editor, not an inpainting model.
+* **Latent inpaint (classic).** VAE-encode a crop, mask its latent, sample. The model is
+  handed a hole with no conditioning for what belongs there, so it tends to invent flat
+  content that ignores the surrounding material. Kept for wholesale replacement, where you
+  *want* the old content gone. Its knobs:
+  * **Regenerate from scratch** - replace the masked pixels (matched colour or noise) so the
+    model cannot read the old content. Off: the original stays visible.
+  * **Fill** - matched colour from the ring around the mask, or noise (Fooocus style).
+  * **Strength** - 1.0 replaces the region, 0.4-0.7 modifies it in place. It only helps with
+    the fill *off*: if the content is erased there is nothing left to modify.
+  * **Model sees** - area + surroundings (crop rendered at ~1024 px) or the whole image.
+  * The sampler may also repaint ~12 px beyond the painted area while only painted pixels
+    are pasted back, so it can blend its own edge.
+
+The mask editor has a full-view mode: the expand button in its toolbar (or `F`) moves the
+canvas and its controls into a window-filling view; `Esc` or *Close* puts everything back on
+the page with the mask intact.
+
+Both the Compose column and the mask column scroll instead of squashing when the window is
+short.
+
+Headless equivalents: `--inpaint-engine edit|latent`, `--inpaint-keep`,
+`--inpaint-fill colour|noise`, `--inpaint-grow N`, `--inpaint-strength 0.05-1.0`,
+`--inpaint-context full|area`.
+
 ## Mask infill, briefly
 
 A hard cut-and-paste leaves a seam and lets existing geometry drift. The reference client
@@ -131,6 +166,18 @@ instead crops around the mask with context, upscales the crop, re-samples **only
 masked latents, then blends back with a few pixels of feather along the painted edge.
 Measured on a pole with hard edges: 0 changed pixels outside `mask + 14 px`, pole edges
 bit-identical above and below the edit. `AGENT.md` §9 has the pipeline and §7 the test.
+
+## Live preview
+
+Settings -> Data controls has a "Live preview" switch. When it is on, the app opens the
+engine's websocket and paints the sampler's own preview frames into the Output pane while
+a job runs; the finished image is identical either way.
+
+It needs the engine started with `--preview-method latent2rgb` (what this build's defaults
+use). `taesd` also works if `models/vae_approx/taeqi2_1_decoder.safetensors` is present -
+prettier, but it costs VRAM. ComfyUI only streams previews to a client that advertises
+`supports_preview_metadata` and passes a matching `client_id` with the prompt; the app does
+both, which is why a plain websocket client sees silence.
 
 ## Status
 

@@ -226,6 +226,9 @@ Without `--fp16-unet` every number is ~3.8× worse.
 | node `TextEncodeQwenImage21` rejects `image_1` | autogrow keys are `images.image_N` | use `images.image_1` |
 | composite pastes the whole frame | `ImageCompositeMasked.mask` is optional and defaults to none | wire it |
 | edit shifted / speckled | reference grid mismatch | pass the crop's own size as `resolution` |
+| Job fails with `[Errno 32] Broken pipe` | the engine died mid-job, usually a stale client or an orphaned engine from a killed app | kill leftover `main.py --listen` processes, restart the engine, re-run |
+| No live-preview frames arrive | engine has no preview method, or the client did not advertise `supports_preview_metadata` / pass the same `client_id` | start the engine with `--preview-method latent2rgb`; the app handles the flag and client id itself |
+| Infill paints a flat patch that ignores the material | the latent engine hands the DiT a noised hole, and this model has no inpaint conditioning | use the default edit + paste engine (whole-image edit, masked paste) |
 | 2048² OOM | VAE decode needs ~7 GB | stay at 1024², upscale afterwards |
 
 ---
@@ -242,6 +245,12 @@ Not a cut-and-paste. In order:
    stops a pole from moving);
 4. decode, downscale to the crop, composite into the original at the crop offset with a
    3–12 px feather **only along the painted edge**.
+
+Two knobs change that pipeline (UI checkboxes, or `--inpaint-keep` and
+`--inpaint-context full`): `inpaintErase` fills the masked pixels with the average colour of the ring around
+the mask before the upload so the model has to invent them instead of copying (default on), and
+`inpaintFullImage` uses the whole frame instead of a crop. Neither changes G5: nothing
+outside the mask may move.
 
 Any implementation that skips (1) gives the model no context; one that skips (3) lets it
 redraw the whole crop; one that feathers widely smears untouched geometry. G5 catches
@@ -269,3 +278,13 @@ If you have your own model service, implement `submit()` against its API, emit
 * list the versions you installed and the gates you passed;
 * if you changed a path or port away from the defaults, write it down — the next person
   will not guess.
+
+## GUI testing
+
+`harness/gui-check.sh` starts a nested Xephyr plus `matchbox-window-manager` and launches
+the app on it. The window manager is not optional: without one Qt maps file dialogs at 0x0
+with keyboard focus, so the UI renders but stops responding to clicks.
+
+    sudo apt-get install -y matchbox-window-manager xserver-xephyr
+    ./harness/gui-check.sh            # display :99, WM, app
+    DISPLAY=:99 import -window root shot.png

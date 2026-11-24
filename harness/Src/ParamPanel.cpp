@@ -8,6 +8,8 @@
 #include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -88,6 +90,15 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     , m_batch(nullptr)
     , m_sampler(nullptr)
     , m_submit(nullptr)
+    , m_queue(nullptr)
+    , m_eraseBox(nullptr)
+    , m_contextBox(nullptr)
+    , m_fillBox(nullptr)
+    , m_engineBox(nullptr)
+    , m_strengthBox(nullptr)
+    , m_fillRow(nullptr)
+    , m_strengthRow(nullptr)
+    , m_ctxRow(nullptr)
     , m_count(nullptr)
 {
     QVBoxLayout *root = new QVBoxLayout(this);
@@ -145,7 +156,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     m_width = new QSpinBox(sizeRow);
     m_width->setRange(256, 2048);
     m_width->setSingleStep(64);
-    m_width->setFixedWidth(72);
+    m_width->setFixedWidth(64);
     m_width->setSuffix("");
     sizeLayout->addWidget(m_width);
 
@@ -156,7 +167,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     m_height = new QSpinBox(sizeRow);
     m_height->setRange(256, 2048);
     m_height->setSingleStep(64);
-    m_height->setFixedWidth(72);
+    m_height->setFixedWidth(64);
     sizeLayout->addWidget(m_height);
 
     QWidget *sizeField = field("Size", sizeRow);
@@ -174,7 +185,7 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
 
     m_steps = new QSpinBox(stepsRow);
     m_steps->setRange(4, 80);
-    m_steps->setFixedWidth(56);
+    m_steps->setFixedWidth(52);
     stepsLayout->addWidget(m_steps);
     grid->addWidget(field("Steps", stepsRow), 1, 0);
 
@@ -241,6 +252,117 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
 
     root->addLayout(grid);
 
+    if (m_mode == PageMode::MaskInfill) {
+        QWidget *maskBox = new QWidget(this);
+        QVBoxLayout *maskLayout = new QVBoxLayout(maskBox);
+        maskLayout->setContentsMargins(0, 12, 0, 0);
+        maskLayout->setSpacing(6);
+
+        QLabel *maskLabel = new QLabel("MASK", maskBox);
+        maskLabel->setObjectName("Hint");
+        maskLayout->addWidget(maskLabel);
+
+        m_eraseBox = new QCheckBox("Regenerate from scratch", maskBox);
+        m_eraseBox->setChecked(true);
+        m_eraseBox->setCursor(Qt::PointingHandCursor);
+        m_eraseBox->setToolTip("Paint the masked pixels out of the reference the model sees, so it "
+                               "has to invent that area instead of copying what was there.");
+        maskLayout->addWidget(m_eraseBox);
+
+        QWidget *engineRow = new QWidget(maskBox);
+        QHBoxLayout *engineLayout = new QHBoxLayout(engineRow);
+        engineLayout->setContentsMargins(0, 0, 0, 0);
+        engineLayout->setSpacing(8);
+        QLabel *engineLabel = new QLabel("Engine", engineRow);
+        engineLabel->setObjectName("Hint");
+        m_engineBox = new QComboBox(engineRow);
+        m_engineBox->addItem("Edit + paste");
+        m_engineBox->addItem("Latent inpaint");
+        m_engineBox->setToolTip("Edit + paste: the model edits the whole picture and only the "
+                                "painted area is copied back. Keeps materials and shading.\n"
+                                "Latent inpaint: classical noise-mask sampling on a crop; "
+                                "replaces the area wholesale, which this model tends to fill flat.");
+        engineLayout->addWidget(engineLabel);
+        engineLayout->addWidget(m_engineBox, 1);
+        maskLayout->addWidget(engineRow);
+
+        QWidget *fillRow = new QWidget(maskBox);
+        m_fillRow = fillRow;
+        QHBoxLayout *fillLayout = new QHBoxLayout(fillRow);
+        fillLayout->setContentsMargins(0, 0, 0, 0);
+        fillLayout->setSpacing(8);
+        QLabel *fillLabel = new QLabel("Fill", fillRow);
+        fillLabel->setObjectName("Hint");
+        m_fillBox = new QComboBox(fillRow);
+        m_fillBox->addItem("Matched colour");
+        m_fillBox->addItem("Noise");
+        m_fillBox->setToolTip("What the masked pixels become before the model sees them: a flat "
+                              "colour sampled from the surroundings, or noise (Fooocus style).");
+        fillLayout->addWidget(fillLabel);
+        fillLayout->addWidget(m_fillBox, 1);
+        maskLayout->addWidget(fillRow);
+
+        QWidget *strengthRow = new QWidget(maskBox);
+        m_strengthRow = strengthRow;
+        QHBoxLayout *strengthLayout = new QHBoxLayout(strengthRow);
+        strengthLayout->setContentsMargins(0, 0, 0, 0);
+        strengthLayout->setSpacing(8);
+        QLabel *strengthLabel = new QLabel("Strength", strengthRow);
+        strengthLabel->setObjectName("Hint");
+        m_strengthBox = new QDoubleSpinBox(strengthRow);
+        m_strengthBox->setRange(0.05, 1.0);
+        m_strengthBox->setSingleStep(0.05);
+        m_strengthBox->setDecimals(2);
+        m_strengthBox->setValue(1.0);
+        m_strengthBox->setToolTip("Latent inpaint only: 1.0 replaces the area, 0.4-0.7 modifies "
+                                  "it in place.");
+        strengthLayout->addWidget(strengthLabel);
+        strengthLayout->addWidget(m_strengthBox, 1);
+        maskLayout->addWidget(strengthRow);
+
+        // The erase/fill/strength/context controls only exist for the latent engine; the
+        // edit engine always edits the whole picture and pastes back through the mask.
+        auto syncEngine = [this](int) {
+            const bool latent = m_engineBox && m_engineBox->currentIndex() == 1;
+            if (m_eraseBox) m_eraseBox->setVisible(latent);
+            if (m_ctxRow) m_ctxRow->setVisible(latent);
+            if (m_fillRow) m_fillRow->setVisible(latent);
+            if (m_strengthRow) m_strengthRow->setVisible(latent);
+            if (m_fillBox) m_fillBox->setEnabled(latent && (!m_eraseBox || m_eraseBox->isChecked()));
+            if (m_strengthBox) m_strengthBox->setEnabled(latent);
+        };
+        connect(m_engineBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+                this, [syncEngine](int i) { syncEngine(i); });
+        connect(m_eraseBox, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_fillBox)
+                m_fillBox->setEnabled(on);
+        });
+
+        QWidget *contextRow = new QWidget(maskBox);
+        m_ctxRow = contextRow;
+        QHBoxLayout *contextLayout = new QHBoxLayout(contextRow);
+        contextLayout->setContentsMargins(0, 0, 0, 0);
+        contextLayout->setSpacing(8);
+
+        QLabel *contextLabel = new QLabel("Model sees", contextRow);
+        contextLabel->setObjectName("Hint");
+
+        m_contextBox = new QComboBox(contextRow);
+        m_contextBox->addItem("Area + surroundings");
+        m_contextBox->addItem("Whole image");
+        m_contextBox->setToolTip("Area + surroundings crops a window around your mask and renders "
+                                 "it at ~1024 px. Whole image hands over the entire frame at native "
+                                 "scale, with less detail on small masks.");
+
+        contextLayout->addWidget(contextLabel);
+        contextLayout->addWidget(m_contextBox, 1);
+        maskLayout->addWidget(contextRow);
+
+        syncEngine(0);
+
+        root->addWidget(maskBox);
+    }
+
     root->addStretch(1);
 
     m_submit = new QPushButton(actionFor(mode), this);
@@ -257,6 +379,15 @@ ParamPanel::ParamPanel(PageMode mode, QWidget *parent)
     root->addWidget(m_count);
 
     connect(m_submit, &QPushButton::clicked, this, &ParamPanel::submitRequested);
+
+    m_queue = new QPushButton(QStringLiteral("Add to queue"), this);
+    m_queue->setObjectName("Ghost");
+    m_queue->setCursor(Qt::PointingHandCursor);
+    m_queue->setFixedHeight(28);
+    m_queue->setToolTip("Run this request after the current one instead of waiting: "
+                        "queue as many as you like, they run in order.");
+    root->addWidget(m_queue);
+    connect(m_queue, &QPushButton::clicked, this, &ParamPanel::queueRequested);
     connect(m_sizeCombo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             this, &ParamPanel::onSizePresetChanged);
     connect(m_width, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, [this](int v) {
@@ -436,6 +567,13 @@ GenerationRequest ParamPanel::request() const
     req.seed = m_seedLock->isChecked() && !m_seed->text().isEmpty()
                    ? m_seed->text().toLongLong()
                    : qint64(-1);
+    if (m_mode == PageMode::MaskInfill) {
+        req.inpaintErase = m_eraseBox ? m_eraseBox->isChecked() : true;
+        req.inpaintFill = (m_fillBox && m_fillBox->currentIndex() == 1) ? 1 : 0;
+        req.inpaintEngine = (m_engineBox && m_engineBox->currentIndex() == 1) ? 1 : 0;
+        req.inpaintStrength = m_strengthBox ? m_strengthBox->value() : 1.0;
+        req.inpaintFullImage = m_contextBox && m_contextBox->currentIndex() == 1;
+    }
     return req;
 }
 
